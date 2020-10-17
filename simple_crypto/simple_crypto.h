@@ -1,34 +1,49 @@
 #ifndef SIMPLE_CRYPTO_H
 #define SIMPLE_CRYPTO_H
 
-#include  <stdio.h>
-#include  <sys/types.h>
+#include  <stdio.h>         /* atoi */
+#include  <stdbool.h>       /* bool */
 #include  <unistd.h>        /* fork sleep */
 #include  <stdlib.h>        /* exit  */
 #include  <string.h>        /* strcpy */
 #include  <ctype.h>         /* isprint */
 
 
-#define INITIAL_SIZE 16
+
+/************************* GENERAL *************************/
+#define INITIAL_SIZE 64
+#define ULL_DIGITS 20
 
 typedef unsigned char byte;
 
+int checkSysCall(int n, char* err);
+
+int readInput(byte array[]);
+
+/*********************** One-Time Pad ***********************/
 struct OneTimePad {
     int len;
-    unsigned char *input;
-    unsigned char *secKey;
-    unsigned char *output;
+    byte *input;
+    byte *secKey;
+    byte *output;
 };
 
-int checkSysCall(int n, char* err){    //syscall management
-    if (n != -1)
-        return n;
-    perror(err);
-    exit(1);
+void getNcharsFromURandom(int n, byte **m);
+
+void otpEncrypt(byte *input, byte *key, byte *output);
+
+/********************** CaesarsChipher **********************/
+struct CaesarsChipher {
+    int len;
+    int secKey;
+    byte *input;
+    byte *output;
 };
 
-void getNcharsFromURandom(int n, char **);
+int readNumber(byte array[]);
 
-int readInput(unsigned char array[]);
+void caesarsCipher(struct CaesarsChipher c, bool encrypt);
+
+/********************* VigenèresChipher *********************/
 
 #endif

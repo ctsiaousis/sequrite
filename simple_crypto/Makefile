@@ -2,11 +2,11 @@ CC = gcc
 
 CFLAGS = -Wall -fstack-protector -std=c99 -O0 -g
 
-OFILES = simple_crypto.o
+OFILES = simple_crypto.o demo.o
 
-CFILE = simple_crypto.c
+CFILE = simple_crypto.c demo.c
 
-EXE = simple_crypto
+EXE = demo
 
 all : ${EXE}
 

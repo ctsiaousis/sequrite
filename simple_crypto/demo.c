@@ -47,9 +47,12 @@ int main() {
   // printf("My key: %d \n", second.secKey);
 
   caesarsCipher(second, true);
-  printf("[Caesars] encrypted: %s\n", second.output);
+  printf("[Caesars] encrypted: ");
+  printMemberCaesars(second, 1); //1 prints c.output
+
   caesarsCipher(second, false);
-  printf("[Caesars] decrypted: %s\n", second.input);
+  printf("[Caesars] decrypted: ");
+  printMemberCaesars(second, 0); //0 prints c.input
 
 /********************* VigenèresChipher *********************/
   struct VigeneresChipher third;
@@ -73,9 +76,12 @@ int main() {
   free(key3);
 
   vigeneres(third, true);
-  printf("[Vigenere] encrypted: %s\n", third.output);
+  printf("[Vigenere] encrypted: ");
+  printMemberVigeneres(third,1); //1 prints c.output
+
   vigeneres(third, false);
-  printf("[Vigenere] decrypted: %s\n", third.input);
+  printf("[Vigenere] decrypted: ");
+  printMemberVigeneres(third,0); //0 prints c.input
 
   return 0;
 }

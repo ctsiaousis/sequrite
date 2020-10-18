@@ -164,7 +164,6 @@ void caesarsCipher(struct CaesarsChipher c, bool encrypt) {
         // trusting user lol
       }
     }
-    memcpy((char*)c.input, (const char*)c.input, c.len);
   }
 }
 
@@ -222,6 +221,37 @@ void vigeneres(struct VigeneresChipher v, bool encrypt){
     }
     if(v.len == 0 ) //prevent zero inputs
       v.input[0] = '\0';
-    memcpy((char*)v.input, (const char*)v.input, v.len);
   }
+}
+
+void printMemberCaesars(struct CaesarsChipher c, int which){
+  int i;
+  if(which == 0){ //print input
+    for(i = 0; i < c.len; i ++){
+      putchar(c.input[i]);
+    }
+  }else { //print output
+    for(i = 0; i < c.len; i ++){
+      putchar(c.output[i]);
+    }
+  } 
+  //print new line
+  printf("\n");
+
+}
+
+void printMemberVigeneres(struct VigeneresChipher c, int which){
+  int i;
+  if(which == 0){ //print input
+    for(i = 0; i < c.len; i ++){
+      putchar(c.input[i]);
+    }
+  }else { //print output
+    for(i = 0; i < c.len; i ++){
+      putchar(c.output[i]);
+    }
+  } 
+  //print new line
+  printf("\n");
+
 }

@@ -46,6 +46,8 @@ int readNumber(byte array[]);
 
 void caesarsCipher(struct CaesarsChipher c, bool encrypt);
 
+void printMemberCaesars(struct CaesarsChipher c, int which);
+
 /********************* VigenèresChipher *********************/
 struct VigeneresChipher {
     int len;
@@ -57,5 +59,7 @@ struct VigeneresChipher {
 int readCaps(byte array[]);
 
 void vigeneres(struct VigeneresChipher v, bool encrypt);
+
+void printMemberVigeneres(struct VigeneresChipher c, int which);
 
 #endif

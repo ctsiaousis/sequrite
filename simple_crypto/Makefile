@@ -1,6 +1,8 @@
 CC = gcc
 
-CFLAGS = -Wall -fstack-protector -std=c99 -O0 -g
+CFLAGS = -Wall -Wformat-security -fPIE -fstack-protector-all \
+		 -Wstack-protector --param ssp-buffer-size=4 \
+		 -D_FORTIFY_SOURCE=2 -std=c99 -O -g
 
 OFILES = simple_crypto.o demo.o
 

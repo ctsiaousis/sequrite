@@ -6,7 +6,7 @@
 #include  <unistd.h>        /* fork sleep */
 #include  <stdlib.h>        /* exit  */
 #include  <string.h>        /* strcpy */
-#include  <ctype.h>         /* isprint */
+#include  <fcntl.h>         /* open */
 
 
 
@@ -33,10 +33,12 @@ void getNcharsFromURandom(int n, byte **m);
 void otpEncrypt(byte *input, byte *key, byte *output);
 
 /********************** CaesarsChipher **********************/
+
 struct CaesarsChipher {
     int len;
     int secKey;
     byte *input;
+    byte *cipher;
     byte *output;
 };
 
@@ -45,5 +47,15 @@ int readNumber(byte array[]);
 void caesarsCipher(struct CaesarsChipher c, bool encrypt);
 
 /********************* VigenèresChipher *********************/
+struct VigeneresChipher {
+    int len;
+    byte *input;
+    byte *secKey;
+    byte *output;
+};
+
+int readCaps(byte array[]);
+
+void vigeneres(struct VigeneresChipher v, bool encrypt);
 
 #endif

@@ -86,7 +86,7 @@ int readNumber(byte array[]) {
   int count = 0;
 
   while ((c = getchar()) != '\n' && count < INITIAL_SIZE - 1) {
-    if ((c < 48) || (57 < c && c < 65) || (90 < c && c < 97) || (122 < c)) {
+    if ((c < '0') || (c > '9')) {
       continue;
     }
     array[count] = c;

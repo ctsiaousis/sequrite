@@ -21,13 +21,17 @@ void encrypt(unsigned char *, int, unsigned char *, unsigned char *,
              unsigned char *, int);
 int decrypt(unsigned char *, int, unsigned char *, unsigned char *,
             unsigned char *, int);
-void gen_cmac(unsigned char *, size_t, unsigned char *, unsigned char *, int);
+int gen_cmac(unsigned char *, size_t, unsigned char *, unsigned char *, int);
 int verify_cmac(unsigned char *, unsigned char *);
-void handleErrors(void);
-EVP_PKEY *returnKeyStructure(unsigned char *, int);
-int nextTimes16(int);
 
 /* TODO Declare your function prototypes here... */
+void handleErrors(void);
+int nextTimes16(int);
+unsigned char *readFile(char *, int *);
+void writeFile(char *, unsigned char* , size_t );
+int nextTimes16(int);
+void concatBuffers(unsigned char * in1, int len1,
+                   unsigned char * in2, int len2, unsigned char * out);
 
 /*
  * Prints the hex value of the input
@@ -127,12 +131,8 @@ void keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
 
   /* TODO Task A */
   int mode = bit_mode / 8;
-
-  /* Create and initialise the context */
-  EVP_CIPHER_CTX *ctx;
-  if (!(ctx = EVP_CIPHER_CTX_new()))
-    handleErrors();
-
+  int pass_len = strlen((const char *)password);
+  // printf("KEYGEN PASS_LEN: %d\n",pass_len);
   /*
    * Gen key & IV for AES 128/256 ECB mode. A SHA1 digest is used to hash the
    * supplied key material.
@@ -145,7 +145,7 @@ void keygen(unsigned char *password, unsigned char *key, unsigned char *iv,
    */
   if (mode !=
       EVP_BytesToKey((mode == 32) ? EVP_aes_256_ecb() : EVP_aes_128_ecb(),
-                     EVP_sha1(), NULL, password, strlen((const char *)password),
+                     EVP_sha1(), NULL, password, pass_len,
                      1, key, iv))
     handleErrors();
 }
@@ -182,14 +182,9 @@ void encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
    * Provide the message to be encrypted, and obtain the encrypted output.
    * EVP_EncryptUpdate can be called multiple times if necessary
    */
-   ecrypt:
   if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
     handleErrors();
   ciphertext_len += len;
-  // if(len < plaintext_len){
-    // printf("I encrypted less.%d\n", ciphertext_len);
-    // goto ecrypt;
-  // }
 
   /*
    * Finalise the encryption. Further ciphertext bytes may be written at
@@ -197,6 +192,9 @@ void encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *key,
    */
   if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
     handleErrors();
+
+  ciphertext_len += len;
+  // printf("cip_len inside encrypt: %d\n",ciphertext_len);
 
   /* Clean up */
   EVP_CIPHER_CTX_free(ctx);
@@ -230,7 +228,7 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
    * is 128 bits
    */
   if (1 != EVP_DecryptInit_ex(
-               ctx, (mode >= 32) ? EVP_aes_256_ecb() : EVP_aes_128_ecb(), NULL,
+               ctx, (mode == 32) ? EVP_aes_256_ecb() : EVP_aes_128_ecb(), NULL,
                key, iv))
     handleErrors();
 
@@ -238,17 +236,16 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
    * Provide the message to be decrypted, and obtain the plaintext output.
    * EVP_DecryptUpdate can be called multiple times if necessary.
    */
-   dcrypt:
   if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
     handleErrors();
-  plaintext_len += len;
-  if(plaintext_len < ciphertext_len-16){
-    printf("jump\n");
-    goto dcrypt;
-  }
 
-  // if (1 != EVP_DecryptFinal_ex(ctx, plaintext, &len))
-    // handleErrors();
+  plaintext_len += len;
+
+  if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
+    handleErrors();
+
+  plaintext_len += len;
+
 
   /* Clean up */
   EVP_CIPHER_CTX_free(ctx);
@@ -259,14 +256,14 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *key,
 /*
  * Generates a CMAC
  */
-void gen_cmac(unsigned char *data, size_t data_len, unsigned char *key,
+int gen_cmac(unsigned char *data, size_t data_len, unsigned char *key,
               unsigned char *cmac, int bit_mode) {
 
   /* TODO Task D */
   size_t req = 0;
 
   if (!data || !key)
-    return;
+    return req;
   /*Determine bit mode*/
   int mode = (bit_mode == 128) ? 16 : 32;
 
@@ -329,7 +326,7 @@ void gen_cmac(unsigned char *data, size_t data_len, unsigned char *key,
 
   CMAC_CTX_free(ctx);
 
-  return;
+  return req;
 }
 
 /*
@@ -341,6 +338,12 @@ int verify_cmac(unsigned char *cmac1, unsigned char *cmac2) {
   verify = 0;
 
   /* TODO Task E */
+  int i;
+  for(i = 0; i < 16; i++){
+    if(cmac1[i] != cmac2[i])
+      return 0;
+  }
+  verify = 1;
 
   return verify;
 }
@@ -357,30 +360,37 @@ void handleErrors(void) {
   exit(EXIT_FAILURE);
 }
 
-unsigned char *readFile(char *path) {
-  FILE *f = fopen(path, "rb");
-  fseek(f, 0, SEEK_END);
-  long fsize = ftell(f);
-  fseek(f, 0, SEEK_SET);
+unsigned char *readFile(char *path, int *size) {
+  FILE *fileptr;
+  unsigned char *buffer;
+  long filelen;
 
-  unsigned char *buff;
-  buff = malloc(fsize + 1);
-  fread(buff, 1, fsize, f);
-  fclose(f);
+  fileptr = fopen(path, "rb");  // Open the file in binary mode
+  fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
+  filelen = ftell(fileptr);             // Get the current byte offset in the file
+  rewind(fileptr);                      // Jump back to the beginning of the file
 
-  buff[fsize] = 0;
-  return buff;
+  buffer = malloc((filelen + 1) * sizeof(unsigned char));
+  fread(buffer, filelen, 1, fileptr); // Read in the entire file
+  fclose(fileptr); // Close the file
+
+  *size = filelen;
+  return buffer;
 }
 
-void writeFile(char *path, unsigned char* buff, int size) {
-  FILE *f = fopen(path, "wb");
+void writeFile(char *path, unsigned char* buff, size_t size) {
+  FILE *f = fopen(path, "w");
 
-  fwrite(buff, 1, size, f);
+  if(size > fwrite(buff, sizeof(unsigned char), size, f))
+    printf("error writing file...\n");
+
   fclose(f);
 }
 
 int nextTimes16(int in){
   printf("infunc: %d\n",in);
+  if((in % 16) == 0)
+    return in+16;
   int i = in;
   for(i = in; i < in+16; i++){
     if( (in % 16) == 0){
@@ -392,9 +402,10 @@ int nextTimes16(int in){
   return 0;
 }
 
+
 void concatBuffers(unsigned char * in1, int len1,
-                              unsigned char * in2, int len2,
-                              unsigned char * out)
+                   unsigned char * in2, int len2,
+                   unsigned char * out)
 {
   unsigned char *temp;
   int i;
@@ -405,77 +416,6 @@ void concatBuffers(unsigned char * in1, int len1,
   for(i = 0; i < len2; i++){
     out[len1+i] = in2[i];
   }
-}
-
-EVP_PKEY *returnKeyStructure(unsigned char *key, int mode) {
-  /*Create CMAC Key*/
-  EVP_PKEY_CTX *kctx;
-  if (!(kctx = EVP_PKEY_CTX_new_id(EVP_PKEY_CMAC, NULL)))
-    handleErrors();
-
-  /*Init CMAC Key*/
-  if (!EVP_PKEY_keygen_init(kctx))
-    handleErrors();
-
-  /*Determine Cipher Based on Mode*/
-  const EVP_CIPHER *ciph = (mode >= 32) ? EVP_aes_256_ecb() : EVP_aes_128_ecb();
-
-  /* Set the cipher to be used for the CMAC */
-  if (EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN, EVP_PKEY_CTRL_CIPHER, 0,
-                        (void *)ciph) <= 0)
-    handleErrors();
-
-  /* Set the key data to be used for the CMAC */
-  if (EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN, EVP_PKEY_CTRL_SET_MAC_KEY,
-                        mode, key) <= 0)
-    handleErrors();
-
-  /* Generate the key */
-  EVP_PKEY *wrappedKey =
-      EVP_PKEY_new(); // =EVP_PKEY_new_mac_key(EVP_PKEY_CMAC, NULL, key, mode);
-  if (!EVP_PKEY_keygen(kctx, &wrappedKey))
-    handleErrors();
-
-  return wrappedKey;
-}
-
-int verify_it(const unsigned char *msg, size_t mlen, const unsigned char *val,
-              size_t vlen, EVP_PKEY *pkey) {
-  /* Returned to caller */
-  int result = 0;
-  EVP_MD_CTX *ctx = NULL;
-  unsigned char buff[EVP_MAX_MD_SIZE];
-  size_t size;
-
-  if (!msg || !mlen || !val || !vlen || !pkey)
-    return 0;
-
-  ctx = EVP_MD_CTX_new();
-  if (ctx == NULL) {
-    printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
-    goto err;
-  }
-
-  if (1 != EVP_DigestSignInit(ctx, NULL, EVP_sha1(), NULL, pkey)) {
-    printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
-    goto err;
-  }
-
-  if (1 != EVP_DigestSignUpdate(ctx, msg, mlen)) {
-    printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
-    goto err;
-  }
-
-  size = sizeof(buff);
-  if (1 != EVP_DigestSignFinal(ctx, buff, &size)) {
-    printf("EVP_DigestSignFinal failed, error 0x%lx\n", ERR_get_error());
-    goto err;
-  }
-
-  result = (vlen == size) && (CRYPTO_memcmp(val, buff, size) == 0);
-err:
-  EVP_MD_CTX_free(ctx);
-  return result;
 }
 
 /*
@@ -548,13 +488,12 @@ int main(int argc, char **argv) {
 
   /* TODO Develop the logic of your tool here... */
   int sizesForModes = bit_mode/8;
-
-  /* Initialize the library */
+  /* Operate on the data according to the mode */
   unsigned char key[sizesForModes], iv[16];
-  unsigned char *input_buff = readFile(input_file);
-  int in_file_len = strlen((const char *)input_buff);
-  print_string(input_buff, in_file_len);//(bit_mode==128)?nextTimes16(in_file_len):nextTimes16(in_file_len)+16;
-  printf("%d\n",sizesForModes);
+  int in_file_len;
+  unsigned char *input_buff = readFile(input_file,&in_file_len);
+
+  // print_string(input_buff, in_file_len);
 
   /* Keygen from password */
   keygen(password, key, iv, bit_mode);
@@ -563,36 +502,19 @@ int main(int argc, char **argv) {
   printf("IV:\n");
   print_hex(iv, strlen((const char *)iv));
 
-  EVP_PKEY *newKey = returnKeyStructure(password, sizesForModes);
-  /***************************TESTING*****************************/
-
-
-  // unsigned char * ciphertext_new = malloc(sizesForModes+16);
-  // EVP_PKEY *newKey = returnKeyStructure(key, sizesForModes);
-  // int i = verify_it(ciphertext, sizesForModes, cmac, cmac_len, newKey);
-  // printf("verify_it: %d\n", i);
-
-  // writeFile(output_file, plaintext, plain_len);
-  // int cmac_len = strlen((const char *)cmac);
-  // print_hex(cmac, cmac_len);
-
-  /***************************\/TESTING*****************************/
-
-  /* Operate on the data according to the mode */
-
-
   /* encrypt */
   /* if op_mode == 0 the tool encrypts */
   if( op_mode == 0 ){
+    /*calculate appropriate cipher buffer length*/
       int ciph_buf_len = nextTimes16(in_file_len);
       unsigned char *ciphertext = malloc(ciph_buf_len);
 
-      encrypt(input_buff, in_file_len, key, iv, ciphertext, bit_mode);
+    /*encrypt input*/
+      encrypt(input_buff, in_file_len, key, NULL, ciphertext, bit_mode);
       printf("cipher text:\n");
       print_hex(ciphertext, ciph_buf_len);
 
-      print_string(ciphertext, ciph_buf_len);
-
+    /*write ciphertext to the file*/
       writeFile(output_file, ciphertext, ciph_buf_len);
       free(ciphertext);
   }
@@ -600,41 +522,46 @@ int main(int argc, char **argv) {
   /* decrypt */
   /* if op_mode == 1 the tool decrypts */
   else if( op_mode == 1 ){
+    /*allocate buffer for ciphertext*/
       unsigned char *plaintext = malloc(in_file_len);
-
-      decrypt(input_buff, in_file_len, key, iv, plaintext, bit_mode);
+    
+    /*decrypt the input cipher*/
+      int plain_len = decrypt(input_buff, in_file_len, key, NULL, plaintext, bit_mode);
       printf("plain text:\n");
-      int plain_len = strlen((const char *)plaintext);
       print_string(plaintext, plain_len);
 
+    /*write plaintext to file*/
       writeFile(output_file, plaintext, plain_len);
       free(plaintext);
   }
+
   /* sign */
   /* if op_mode == 2 the tool signs */
   else if( op_mode == 2 ){
       unsigned char *cmac = OPENSSL_malloc(sizesForModes);
 
-      //encrypt
-      int ciph_buf_len = nextTimes16(in_file_len) + 16;
+    /*allocate appropriate ciphertext buffer*/
+      int ciph_buf_len = nextTimes16(in_file_len);
       unsigned char *ciphertext = malloc(ciph_buf_len);
-      encrypt(input_buff, in_file_len, key, iv, ciphertext, bit_mode);
+
+    /*encrypt*/
+      encrypt(input_buff, in_file_len, key, NULL, ciphertext, bit_mode);
       printf("encrypted:\n");
       print_hex(ciphertext, ciph_buf_len);
 
-      // generate
-      gen_cmac(ciphertext, ciph_buf_len, key, cmac, bit_mode);
-      int cmac_len = strlen(cmac);
+    /*generate cmac from the plaintext*/
+      int cmac_len = gen_cmac(input_buff, in_file_len, key, cmac, bit_mode);
       printf("CMAC sign:\n");
       print_hex(cmac, cmac_len);
+
+    /*concatenate the two buffers*/
       unsigned char * newText = malloc(cmac_len+ciph_buf_len);
       concatBuffers(ciphertext, ciph_buf_len, cmac, cmac_len, newText);
+      // printf("to file: %d\n",cmac_len+ciph_buf_len);
+      // print_hex(newText, cmac_len+ciph_buf_len);
 
-
-      printf("to file:\n");
-      print_hex(newText, cmac_len+ciph_buf_len);
-      writeFile(output_file, newText, cmac_len+in_file_len);
-      
+    /*write ciphertext and CMAC sign to file*/
+      writeFile(output_file, newText, cmac_len+ciph_buf_len);
       free(ciphertext);
       free(newText);
       OPENSSL_free(cmac);
@@ -642,21 +569,38 @@ int main(int argc, char **argv) {
   /* verify */
   /* if op_mode == 3 the tool verifies */
   else if( op_mode == 3 ){
-      // EVP_PKEY *newKey = returnKeyStructure(key, sizesForModes);
-      // unsigned char *plaintext = malloc(in_file_len);
+      // EVP_PKEY *newKey = returnKeyStructure(password, sizesForModes);
+    /*allocate plaintext buffer*/
+      unsigned char *plaintext = malloc(in_file_len);
+      unsigned char *cmac = OPENSSL_malloc(16);
 
-      // decrypt(input_buff, in_file_len, key, iv, plaintext, bit_mode);
-      // printf("plain text:\n");
-      // int plain_len = strlen((const char *)plaintext);
-      // print_string(plaintext, plain_len);
+    /*calculate the length without the CMAC sign*/
+      int len_without = in_file_len - 16;
 
+    /*decrypt*/
+      int plain_len = decrypt(input_buff, len_without, key, NULL, plaintext, bit_mode);
+      printf("plain text:\n");
+      print_string(plaintext, plain_len);
 
+    /*generate*/
+      int cmac_len = gen_cmac(plaintext, plain_len, key, cmac, bit_mode);
+      printf("cmaclen: %d\n",cmac_len);
+
+    /*verify*/
       // int i = verify_it(plaintext, plain_len, cmac, cmac_len, newKey);
-      // printf("verify_it: %d\n", i);
+      int v = verify_cmac(input_buff+len_without, cmac);
+      printf("verify_it: %d\n", v);
 
-      // writeFile(output_file, plaintext, plain_len);
-      // int cmac_len = strlen((const char *)cmac);
-      // print_hex(cmac, cmac_len);
+      if(v){
+        /*write to file*/
+        writeFile(output_file, plaintext, plain_len);
+      }else{
+        printf("file not verified, thus not saved.\n");
+      }
+
+      free(plaintext);
+      OPENSSL_free(cmac);
+      // OPENSSL_free(newKey);
   }
 
   /* Clean up */
@@ -667,3 +611,76 @@ int main(int argc, char **argv) {
   /* END */
   return 0;
 }
+
+/*NOT in use, but good functions if you want to play with the EVP key structures. =)*/
+
+// EVP_PKEY *returnKeyStructure(unsigned char *key, int mode) {
+//   /*Create CMAC Key*/
+//   EVP_PKEY_CTX *kctx;
+//   if (!(kctx = EVP_PKEY_CTX_new_id(EVP_PKEY_CMAC, NULL)))
+//     handleErrors();
+
+//   /*Init CMAC Key*/
+//   if (!EVP_PKEY_keygen_init(kctx))
+//     handleErrors();
+
+//   /*Determine Cipher Based on Mode*/
+//   const EVP_CIPHER *ciph = (mode >= 32) ? EVP_aes_256_ecb() : EVP_aes_128_ecb();
+
+//   /* Set the cipher to be used for the CMAC */
+//   if (EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN, EVP_PKEY_CTRL_CIPHER, 0,
+//                         (void *)ciph) <= 0)
+//     handleErrors();
+
+//   /* Set the key data to be used for the CMAC */
+//   if (EVP_PKEY_CTX_ctrl(kctx, -1, EVP_PKEY_OP_KEYGEN, EVP_PKEY_CTRL_SET_MAC_KEY,
+//                         mode, key) <= 0)
+//     handleErrors();
+
+//   /* Generate the key */
+//   EVP_PKEY *wrappedKey =
+//       EVP_PKEY_new(); // =EVP_PKEY_new_mac_key(EVP_PKEY_CMAC, NULL, key, mode);
+//   if (!EVP_PKEY_keygen(kctx, &wrappedKey))
+//     handleErrors();
+
+//   return wrappedKey;
+// }
+
+// int verify_it(const unsigned char *msg, size_t mlen, const unsigned char *val,
+//               size_t vlen, EVP_PKEY *pkey) {
+//   /* Returned to caller */
+//   int result = 0;
+//   EVP_MD_CTX *ctx = NULL;
+//   unsigned char buff[EVP_MAX_MD_SIZE];
+//   size_t size;
+
+//   if (!msg || !mlen || !val || !vlen || !pkey)
+//     return 0;
+
+//   ctx = EVP_MD_CTX_new();
+//   if (ctx == NULL) {
+//     printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+//     goto err;
+//   }
+
+//   if (1 != EVP_DigestSignInit(ctx, NULL, EVP_sha1(), NULL, pkey)) {
+//     printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+//     goto err;
+//   }
+
+//   if (1 != EVP_DigestSignUpdate(ctx, msg, mlen)) {
+//     printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+//     goto err;
+//   }
+
+//   size = sizeof(buff);
+//   if (1 != EVP_DigestSignFinal(ctx, buff, &size)) {
+//     printf("EVP_DigestSignFinal failed, error 0x%lx\n", ERR_get_error());
+//     goto err;
+//   }
+
+//   result = (vlen == size) && (CRYPTO_memcmp(val, buff, size) == 0);
+// err:
+//   EVP_MD_CTX_free(ctx);
+//   return result;
+// }

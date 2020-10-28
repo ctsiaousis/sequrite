@@ -3,12 +3,12 @@ DBUG = -g
 CCFLAGS = -O2 -Wall -pedantic
 LIBSSL = -lssl -lcrypto
 
-TARGETS = assign_1
+TARGETS = ssl_tool
 
 
 all: $(TARGETS)
 
-assign_1: assign_1.c
+ssl_tool: ssl_tool.c
 	$(CC) $(CCFLAGS) $(DBUG) -o $@ $< $(LIBSSL)
 
 clean:

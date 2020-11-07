@@ -6,14 +6,16 @@
  *			numbers there are
  *				until n.
  *
- * 	x 	 		  ||π(x) 		|x/ln x 	|x/(ln x
- *-1) 1000 		  ||168 		|145 		|169 10000
- *||1229 		|1086 		|1218
+ * 	x 	 		  ||π(x) 		|x/ln x 	|x/(ln x-1)
+ *  1000 		  ||168 		|145 		  |169 
+ *  10000     ||1229 		|1086 		|1218
  * 	100000 		||9592 		|8686 		|9512
  * 	1000000 	||78498 	|72382 		|78030
  * 	10000000 	||664579 	|620420 	|661459
  */
-int sieve_estimate(int n) { return floor(n / (log(n) - 1)); }
+int sieve_estimate(int n) { 
+  return floor(n / (log(n) - 1)); 
+}
 
 /*
  * Sieve of Eratosthenes Algorithm
@@ -79,9 +81,6 @@ return all i such that A[i] is true.
  * ret: the GCD
  */
 int gcd(int a, int b) {
-  // if (a == 0)
-  //   return b;
-  // return gcd(b % a, a);
       if (b != 0)
         return gcd(b, a % b);
     else
@@ -98,8 +97,10 @@ int gcd(int a, int b) {
  */
 size_t choose_e(size_t fi_n, size_t* primes) {
   size_t e;
+  // the bigger the e the better
+  int start= (fi_n>1000) ? 3 : 0; //primes[3]=7
   int i;
-  for (i = 0; i < fi_n; i++) { // the bigger the e the better
+  for (i = start; i < fi_n; i++) { 
     if ((gcd(primes[i], fi_n) == 1) && (primes[i] % fi_n != 0))
       break;
   }
@@ -124,6 +125,7 @@ size_t mod_inverse(size_t a, size_t b) {
   for (x = 1; x < b; x++)
       if ((a * x) % b == 1)
           return x;
+  return -1;
 }
 
 /*
@@ -175,6 +177,9 @@ void rsa_keygen(void) {
   printf("n: %zu \te: %zu\n", privKey[0], privKey[1]);
   writeFile("./public.key", pubKey, 2, SIZE_T);
   writeFile("./private.key", privKey, 2, SIZE_T);
+
+  //free
+  free(primes);
 }
 
 /*
@@ -209,6 +214,11 @@ void rsa_encrypt(char *input_file, char *output_file, char *key_file) {
   printf("\n");
 
   writeFile(output_file, ciph, message_len, SIZE_T);
+
+  //free
+  free(key);
+  free(message);
+  free(ciph);
 }
 
 /*
@@ -247,6 +257,11 @@ void rsa_decrypt(char *input_file, char *output_file, char *key_file) {
   printf("\n");
 
   writeFile(output_file, message, message_len, UCHAR);
+  
+  //free
+  free(key);
+  free(message);
+  free(ciph);
 }
 
 /**
@@ -275,7 +290,7 @@ size_t compute(size_t a, size_t b, size_t c) {
   return res;
 }
 
-/*
+/* *************DEV NOTES******************
 
 c:=1
 for i:=ℓ down to 0 do

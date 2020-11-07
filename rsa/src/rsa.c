@@ -6,9 +6,9 @@
  *			numbers there are
  *				until n.
  *
- * 	x 	 		  ||π(x) 		|x/ln x 	|x/(ln x -1)
- * 	1000 		  ||168 		|145 		|169
- * 	10000 		||1229 		|1086 		|1218
+ * 	x 	 		  ||π(x) 		|x/ln x 	|x/(ln x
+ *-1) 1000 		  ||168 		|145 		|169 10000
+ *||1229 		|1086 		|1218
  * 	100000 		||9592 		|8686 		|9512
  * 	1000000 	||78498 	|72382 		|78030
  * 	10000000 	||664579 	|620420 	|661459
@@ -79,9 +79,13 @@ return all i such that A[i] is true.
  * ret: the GCD
  */
 int gcd(int a, int b) {
-  if (a == 0)
-    return b;
-  return gcd(b % a, a);
+  // if (a == 0)
+  //   return b;
+  // return gcd(b % a, a);
+      if (b != 0)
+        return gcd(b, a % b);
+    else
+        return a;
 }
 
 /*
@@ -92,15 +96,14 @@ int gcd(int a, int b) {
  *
  * ret: 'e'
  */
-size_t choose_e(size_t fi_n) {
+size_t choose_e(size_t fi_n, size_t* primes) {
   size_t e;
-
   int i;
-  for (i = fi_n / 8; i < fi_n; i++) { // the bigger the e the better
-    if ((gcd(i, fi_n) == 1) && (i % fi_n != 0))
+  for (i = 0; i < fi_n; i++) { // the bigger the e the better
+    if ((gcd(primes[i], fi_n) == 1) && (primes[i] % fi_n != 0))
       break;
   }
-  e = i;
+  e = primes[i];
 
   return e; // this is also prime!
 }
@@ -113,36 +116,14 @@ size_t choose_e(size_t fi_n) {
  *
  * ret: modular inverse
  *
- *	ed ≡ 1(mod φ(n)).
+ *	x*a ≡ 1(mod b).
  */
 size_t mod_inverse(size_t a, size_t b) {
-  size_t d;
-  int m0 = b;
-  int y = 0;
-  int x = 1;
-
-  if (b == 1)
-    return 0;
-
-  while (a > 1) {
-    // q is quotient
-    int q = a / b;
-    int t = b;
-    b = a % b;
-    a = t;
-    t = y;
-
-    // Update y and x
-    y = x - q * y;
-    x = t;
-  }
-
-  // Make x positive
-  if (x < 0)
-    x += m0;
-
-  d = x;
-  return d;
+  size_t x;
+  a = a % b;
+  for (x = 1; x < b; x++)
+      if ((a * x) % b == 1)
+          return x;
 }
 
 /*
@@ -175,7 +156,7 @@ void rsa_keygen(void) {
   printf("\n n=%zu", n);
   fi_n = ((p - 1) * (q - 1));
   printf("\n fi_n=%zu", fi_n);
-  e = choose_e(fi_n);
+  e = choose_e(fi_n, primes);
   printf("\nI chose e as: %zu \t to be sure, gcd(e,fi_n)=%d\n", e,
          gcd(e, fi_n));
 
@@ -189,33 +170,11 @@ void rsa_keygen(void) {
   privKey[1] = e;
 
   printf("PUBLIC:\n");
-  printf("%zu \t%zu\n", pubKey[0], pubKey[1]);
+  printf("n: %zu \td: %zu\n", pubKey[0], pubKey[1]);
   printf("PRIVATE\n");
-  printf("%zu \t%zu\n", privKey[0], privKey[1]);
-  writeFile("./test.pubKey", pubKey, 2);
-  //TEEEEEST
-  char *message = "this is a stupid test.";
-  size_t *cipher = malloc(sizeof(size_t) * 22);
-
-  size_t j;
-  for (j = 0; j < 22; j++) {
-    // mesage^e mod n
-    cipher[j] = modpow(message[j], e, n);
-  }
-
-  for (j = 0; j < 22; j++) {
-    printf("%zu\t",cipher[j]);
-  }
-  char* new_message = malloc(sizeof(char) * 22);
-  for (j = 0; j < 22; j++) {
-    // cipher^d mod n
-    new_message[j] = (char)modpow(cipher[j], d, n);
-  }
-
-  printf("\n");
-  for (j = 0; j < 22; j++) {
-    printf("%c\t",message[j]);
-  }
+  printf("n: %zu \te: %zu\n", privKey[0], privKey[1]);
+  writeFile("./public.key", pubKey, 2, SIZE_T);
+  writeFile("./private.key", privKey, 2, SIZE_T);
 }
 
 /*
@@ -227,29 +186,29 @@ void rsa_keygen(void) {
  */
 void rsa_encrypt(char *input_file, char *output_file, char *key_file) {
   // read files
-  // size_t message_len;
-  // size_t *message = readFile(input_file,&message_len);
   size_t key_len;
-  size_t *key = readFile(key_file, &key_len);
+  size_t *key = readFile(key_file, &key_len, SIZE_T);
   printf("\nREAD KEY: %zu and %zu", key[0], key[1]);
   printf("\nAnd Size %zu\n", key_len);
+  size_t message_len;
+  unsigned char *message = readFile(input_file, &message_len, UCHAR);
+  printf("\nmessage Size %zu\n", message_len);
 
-  char *message = "this is a stupid test.";
-  size_t *cipher = malloc(sizeof(size_t) * 22);
-
-  size_t n = key[0];
-  size_t e = key[1];
-  size_t i;
-  for (i = 0; i < 22; i++) {
-    // mesage^e mod n
-    cipher[i] = modpow(message[i], e, n);
+  size_t *ciph = malloc(sizeof(size_t) * message_len);
+  size_t j;
+  for (j = 0; j < message_len; j++) {
+    // cipher^d mod n
+    ciph[j] = compute((char)message[j], key[1], key[0]);
+    printf("%d\t", message[j]);
   }
 
-  // for (i = 0; i < 22; i++) {
-  //   printf("%zu\t",cipher[i]);
-  // }
+  printf("\n Calculated from pow=%zu\tmod=%zu\n",key[1], key[0]);
+  for (j = 0; j < message_len; j++) {
+    printf("%zu\t", ciph[j]);
+  }
+  printf("\n");
 
-  // printf("\n");
+  writeFile(output_file, ciph, message_len, SIZE_T);
 }
 
 /*
@@ -262,14 +221,116 @@ void rsa_encrypt(char *input_file, char *output_file, char *key_file) {
 void rsa_decrypt(char *input_file, char *output_file, char *key_file) {
 
   /* TODO */
-  // char *message = "this is a stupid test.";
-  // size_t *cipher = malloc(sizeof(size_t) * 22);
-  // for (j = 0; j < 2; i++) {
-  //   // cipher^d mod n
-  //   message[j] = (char)modpow(cipher[j], d, n);
-  // }
+  size_t key_len;
+  size_t *key = readFile(key_file, &key_len, SIZE_T);
+  printf("\nREAD KEY: %zu and %zu", key[0], key[1]);
+  printf("\nAnd Size %zu\n", key_len);
 
-  // for (j = 0; j < 2; j++) {
-  //   printf("%c\t",message[j]);
-  // }
+  size_t ciph_len;
+  size_t *ciph = readFile(input_file, &ciph_len, SIZE_T);
+  printf("\nCipher Size %zu\n", ciph_len);
+  int message_len = ciph_len/8;
+  unsigned char *message = malloc(sizeof(char) * message_len);
+  int j;
+  printf("--cipher--\n");
+  for (j = 0; j < message_len; j++) {
+    // cipher^d mod n
+    message[j] = (unsigned char) ( compute(ciph[j], key[1], key[0]) % 128);
+    printf("%zu\t", ciph[j]);
+  }
+  
+  printf("\n Calculated from pow=%zu\tmod=%zu\n",key[1], key[0]);
+  printf("--message--\n");
+  for (j = 0; j < message_len; j++) {
+    printf("%d\t", message[j]);
+  }
+  printf("\n");
+
+  writeFile(output_file, message, message_len, UCHAR);
 }
+
+/**
+ * Computes a^b mod c
+ *
+ * m^p modulo n = m^(p%f(n)) modulo n
+ *
+ * (a^5) = a^2 * a^2 * a
+ */
+size_t compute(size_t a, size_t b, size_t c) {
+  size_t res = 1;
+  // int i;
+  // for(i = 63; i >= 0; i++){
+  //   res = (long long)( pow(res,2) * pow(a,(b >> i) & 1) ) % c ;
+  // }
+  // res = fmod(pow(a,b),c);
+  //---------------------------------------------
+  a = a % c;
+  while(b > 0) {
+  	if(b & 1) {
+  		res = (res * a) % c;
+  	}
+  	a = (a * a) % c;
+  	b = floor(b/2);
+  }
+  return res;
+}
+
+/*
+
+c:=1
+for i:=ℓ down to 0 do
+c:= c^2 ⋅ m^e_i % n
+return c
+
+ℓ e bits.
+
+take the k'th bit (e >> k) & 1
+
+*/
+
+/*
+function MultiPrecisionREDC is
+    Input: Integer N with gcd(B, N) = 1, stored as an array of p words,
+           Integer R = Br,     --thus, r = logB R
+           Integer N′ in [0, B − 1] such that NN′ ≡ −1 (mod B),
+           Integer T in the range 0 ≤ T < RN, stored as an array of r + p words.
+
+    Output: Integer S in [0, N − 1] such that TR−1 ≡ S (mod N), stored as an
+array of p words.
+
+    Set T[r + p] = 0  (extra carry word)
+    for 0 ≤ i < r do
+        --loop1- Make T divisible by Bi+1
+
+        c ← 0
+        m ← T[i] ⋅ N′ mod B
+        for 0 ≤ j < p do
+            --loop2- Add the low word of m ⋅ N[j] and the carry from earlier,
+and find the new carry
+
+            x ← T[i + j] + m ⋅ N[j] + c
+            T[i + j] ← x mod B
+            c ← ⌊x / B⌋
+        end for
+        for p ≤ j ≤ r + p − i do
+            --loop3- Continue carrying
+
+            x ← T[i + j] + c
+            T[i + j] ← x mod B
+            c ← ⌊x / B⌋
+        end for
+    end for
+
+    for 0 ≤ i ≤ p do
+        S[i] ← T[i + r]
+    end for
+
+    if S ≥ N then
+        return S − N
+    else
+        return S
+    end if
+end function
+
+
+ */

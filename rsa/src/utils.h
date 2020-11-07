@@ -5,7 +5,10 @@
 #include <stdlib.h>
 #include  <fcntl.h>         /* open */
 
-
+typedef enum {
+    UCHAR,
+    SIZE_T
+} TYPE;
 /*
  * Prints the hex value of the input, 16 values per line
  *
@@ -44,11 +47,10 @@ usage(void);
 void
 check_args(char *, char *, char *, int);
 
-size_t *readFile(char *path, size_t *size);
+void *readFile(char *, size_t*, TYPE);
 
-size_t modpow(long long a, long long b, int c);
 
-void writeFile(char* , size_t*, size_t);
+void writeFile(char* , void*, size_t, TYPE);
 
 int getRandom(int);
 #endif /* _UTILS_H */

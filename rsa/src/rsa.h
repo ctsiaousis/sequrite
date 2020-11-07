@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <math.h>
 
+
 # define RSA_SIEVE_LIMIT 255
 
 /*
@@ -53,7 +54,7 @@ gcd(int , int);
  * ret: 'e'
  */
 size_t
-choose_e(size_t);
+choose_e(size_t, size_t*);
 
 
 /*
@@ -98,4 +99,8 @@ void
 rsa_decrypt(char *, char *, char *);
 
 
+/**
+ * Computes a^b mod c
+ */
+size_t compute(size_t a, size_t b, size_t c);
 #endif /* _RSA_H */

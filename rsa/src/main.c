@@ -18,9 +18,6 @@ int
 main(int argc, char **argv)
 {
 	srand(time(0));
-	rsa_keygen();
-	rsa_encrypt(NULL, NULL, "./test.pubKey");
-	return -1;
 	int opt;				/* used for command line arguments */
 	int op_mode;			/* operation mode                  */
 	char *input_file;		/* path to the input file          */

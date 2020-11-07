@@ -94,27 +94,11 @@ void check_args(char *input_file, char *output_file, char *key_file,
 
 
 /**
- * Computes a^b mod c
- */
-size_t modpow(long long a, long long b, int c) {
-	int res = 1;
-	while(b > 0) {
-		/* Need long multiplication else this will overflow... */
-		if(b & 1) {
-			res = (res * a) % c;
-		}
-		b = b >> 1;
-		a = (a * a) % c; /* Same deal here */
-	}
-	return res;
-}
-
-/**
  * Reads a file returning a size_t array
  */
-size_t *readFile(char *path, size_t *size) {
+void *readFile(char *path, size_t *size, TYPE t) {
   FILE *fileptr;
-  size_t *buffer;
+  void *buffer;
   size_t filelen;
 
   fileptr = fopen(path, "rb"); // Open the file in binary mode
@@ -122,8 +106,20 @@ size_t *readFile(char *path, size_t *size) {
   filelen = ftell(fileptr);    // Get the current byte offset in the file
   rewind(fileptr);             // Jump back to the beginning of the file
 
-  buffer = malloc((filelen + 1) * sizeof(unsigned char));
-  fread(buffer, filelen, sizeof(size_t), fileptr); // Read in the entire file
+  switch(t){
+        case UCHAR:
+            buffer = (unsigned char*)malloc((filelen) * sizeof(unsigned char));
+            fread(buffer, filelen, sizeof(unsigned char), fileptr); // Read in the entire file
+            break;
+        case SIZE_T:
+            buffer = (size_t*)malloc((filelen) * sizeof(size_t));
+            fread(buffer, filelen, sizeof(size_t), fileptr);
+            break;
+        default:
+            printf("wrong type call.\n");
+            break;
+    }
+  
   fclose(fileptr);                    // Close the file
 
   *size = filelen;
@@ -133,11 +129,22 @@ size_t *readFile(char *path, size_t *size) {
 /**
  * Writes a size_t array to a file
  */
-void writeFile(char *path, size_t *buff, size_t size) {
+void writeFile(char *path, void *buff, size_t size, TYPE t) {
   FILE *f = fopen(path, "w");
 
-  if (size > fwrite(buff, sizeof(size_t), size, f))
+  switch(t){
+        case UCHAR:
+              if (size > fwrite(buff, sizeof(unsigned char), size, f))
     printf("error writing file...\n");
+            break;
+        case SIZE_T:
+              if (size > fwrite(buff, sizeof(size_t), size, f))
+    printf("error writing file...\n");
+            break;
+        default:
+            printf("wrong type call.\n");
+            break;
+    }
 
   fclose(f);
 }

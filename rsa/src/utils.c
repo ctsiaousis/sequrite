@@ -1,5 +1,9 @@
 #include "utils.h"
+#include "rsa.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 /*
  * Prints the hex value of the input
@@ -46,9 +50,9 @@ void print_string(unsigned char *data, size_t len) {
 void usage(void) {
   printf("\n"
          "Usage:\n"
-         "    assign_3 -g \n"
-         "    assign_3 -i in_file -o out_file -k key_file [-d | -e]\n"
-         "    assign_3 -h\n");
+         "    ./assign_3 -g -v\n"
+         "    ./assign_3 -i in_file -o out_file -k key_file [-d | -e]\n"
+         "    ./assign_3 -h\n");
   printf("\n"
          "Options:\n"
          " -i    path    Path to input file\n"
@@ -57,6 +61,7 @@ void usage(void) {
          " -d            Decrypt input and store results to output\n"
          " -e            Encrypt input and store results to output\n"
          " -g            Generates a keypair and saves to 2 files\n"
+         " -v            Verbose output."
          " -h            This help message\n");
   exit(EXIT_FAILURE);
 }
@@ -101,11 +106,16 @@ void *readFile(char *path, size_t *size, TYPE t) {
   void *buffer;
   size_t filelen;
 
+  if( access(path, F_OK) == -1){
+    printf("Seems that file does not exist.\n");
+    exit(-1);
+  }
   fileptr = fopen(path, "rb"); // Open the file in binary mode
+
   fseek(fileptr, 0, SEEK_END); // Jump to the end of the file
   filelen = ftell(fileptr);    // Get the current byte offset in the file
   rewind(fileptr);             // Jump back to the beginning of the file
-
+  
   switch(t){
         case UCHAR:
             buffer = (unsigned char*)malloc((filelen) * sizeof(unsigned char));
@@ -119,8 +129,10 @@ void *readFile(char *path, size_t *size, TYPE t) {
             printf("wrong type call.\n");
             break;
     }
-  
+
+
   fclose(fileptr);                    // Close the file
+
 
   *size = filelen;
   return buffer;
@@ -153,6 +165,7 @@ void writeFile(char *path, void *buff, size_t size, TYPE t) {
  * Returns a pseudo random integer
  */
 int getRandom(int thresh) {
-  printf("\npseudorandom :%d\n", (int)random()%thresh);
+  if( isVerbose() )
+    printf("\npseudorandom : %d\n", (int)random()%thresh);
   return (int)random()%thresh;
 }

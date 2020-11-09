@@ -2,6 +2,11 @@
 #include "utils.h"
 #include <stdlib.h>
 
+int verbose = 0;
+void setVerbose(int v){ verbose = v; }
+int isVerbose(){ return verbose; }
+
+
 /*		Calculate an estimation of prime
  *			numbers there are
  *				until n.
@@ -65,8 +70,6 @@ return all i such that A[i] is true.
     }
   }
 
-  printf("k: %d\n", (k));
-
   *primes_sz = k;
   free(A);
   return primes;
@@ -95,13 +98,13 @@ int gcd(int a, int b) {
  *
  * ret: 'e'
  */
-size_t choose_e(size_t fi_n, size_t* primes) {
+size_t choose_e(size_t fi_n, size_t* primes, size_t poolSize) {
   size_t e;
   // the bigger the e the better
   int start= (fi_n>1000) ? 3 : 0; //primes[3]=7
   int i;
   for (i = start; i < fi_n; i++) { 
-    if ((gcd(primes[i], fi_n) == 1) && (primes[i] % fi_n != 0))
+    if ((gcd(primes[i%poolSize], fi_n) == 1) && (primes[i%poolSize] % fi_n != 0))
       break;
   }
   e = primes[i];
@@ -144,26 +147,19 @@ void rsa_keygen(void) {
   int i;
   int prime_sz;
   size_t *primes = sieve_of_eratosthenes(RSA_SIEVE_LIMIT, &prime_sz);
-  for (i = 0; i < prime_sz; i++) {
-    if ((i % 16) == 0 || i == 0) {
-      printf("\n");
-    }
-    printf("%zu\t", primes[i]);
-  }
+
 
   p = primes[getRandom(prime_sz)];
-  q = primes[getRandom(prime_sz)];
-  printf("\n p=%zu \tq=%zu", p, q);
+  q = p; 
+  while(q == p){
+    q = primes[getRandom(prime_sz)];
+  }
   n = p * q;
-  printf("\n n=%zu", n);
   fi_n = ((p - 1) * (q - 1));
-  printf("\n fi_n=%zu", fi_n);
-  e = choose_e(fi_n, primes);
-  printf("\nI chose e as: %zu \t to be sure, gcd(e,fi_n)=%d\n", e,
-         gcd(e, fi_n));
+  e = choose_e(fi_n, primes, prime_sz);
+  
 
   d = mod_inverse(e, fi_n);
-  printf("\nI chose d as: %zu\n", d);
 
   size_t pubKey[2], privKey[2];
   pubKey[0] = n;
@@ -171,10 +167,29 @@ void rsa_keygen(void) {
   privKey[0] = n;
   privKey[1] = e;
 
-  printf("PUBLIC:\n");
-  printf("n: %zu \td: %zu\n", pubKey[0], pubKey[1]);
-  printf("PRIVATE\n");
-  printf("n: %zu \te: %zu\n", privKey[0], privKey[1]);
+  if( verbose ){
+    printf("The pool created:\n");
+    for (i = 0; i < prime_sz; i++) {
+      if ((i % 16) == 0 || i == 0) {
+        printf("\n");
+      }
+      printf("%zu\t", primes[i]);
+    }
+    
+    printf("\n p = %zu \tq = %zu", p, q);
+    printf("\n n = %zu", n);
+    printf("\n fi_n = %zu", fi_n);
+
+    printf("\nI chose e as: %zu\n", e);
+    
+    printf("\nI chose d as: %zu\n", d);
+
+    printf("PUBLIC:\n");
+    printf("n: %zu \td: %zu\n", pubKey[0], pubKey[1]);
+    printf("PRIVATE\n");
+    printf("n: %zu \te: %zu\n", privKey[0], privKey[1]);
+  }
+
   writeFile("./public.key", pubKey, 2, SIZE_T);
   writeFile("./private.key", privKey, 2, SIZE_T);
 
@@ -193,25 +208,29 @@ void rsa_encrypt(char *input_file, char *output_file, char *key_file) {
   // read files
   size_t key_len;
   size_t *key = readFile(key_file, &key_len, SIZE_T);
-  printf("\nREAD KEY: %zu and %zu", key[0], key[1]);
-  printf("\nAnd Size %zu\n", key_len);
   size_t message_len;
   unsigned char *message = readFile(input_file, &message_len, UCHAR);
-  printf("\nmessage Size %zu\n", message_len);
 
   size_t *ciph = malloc(sizeof(size_t) * message_len);
   size_t j;
   for (j = 0; j < message_len; j++) {
     // cipher^d mod n
     ciph[j] = compute((char)message[j], key[1], key[0]);
-    printf("%d\t", message[j]);
   }
 
-  printf("\n Calculated from pow=%zu\tmod=%zu\n",key[1], key[0]);
-  for (j = 0; j < message_len; j++) {
-    printf("%zu\t", ciph[j]);
+  if( verbose ){
+    printf("\nKEY: %zu and %zu", key[0], key[1]);
+    printf("\nSize %zu\n", key_len);
+    printf("---Message---\n");
+    print_string(message, message_len);
+    printf("\nmessage Size %zu\n", message_len);
+    printf("---Cipher---\n");
+    for (j = 0; j < message_len; j++) {
+      printf("%zu\t", ciph[j]);
+    }
+    printf("\n Calculated from pow = %zu\tmod = %zu\n",key[1], key[0]);
   }
-  printf("\n");
+
 
   writeFile(output_file, ciph, message_len, SIZE_T);
 
@@ -233,28 +252,32 @@ void rsa_decrypt(char *input_file, char *output_file, char *key_file) {
   /* TODO */
   size_t key_len;
   size_t *key = readFile(key_file, &key_len, SIZE_T);
-  printf("\nREAD KEY: %zu and %zu", key[0], key[1]);
-  printf("\nAnd Size %zu\n", key_len);
 
   size_t ciph_len;
   size_t *ciph = readFile(input_file, &ciph_len, SIZE_T);
-  printf("\nCipher Size %zu\n", ciph_len);
   int message_len = ciph_len/8;
   unsigned char *message = malloc(sizeof(char) * message_len);
   int j;
-  printf("--cipher--\n");
   for (j = 0; j < message_len; j++) {
     // cipher^d mod n
     message[j] = (unsigned char) ( compute(ciph[j], key[1], key[0]) % 128);
-    printf("%zu\t", ciph[j]);
   }
   
-  printf("\n Calculated from pow=%zu\tmod=%zu\n",key[1], key[0]);
-  printf("--message--\n");
-  for (j = 0; j < message_len; j++) {
-    printf("%d\t", message[j]);
+  if( verbose ){
+    printf("\nREAD KEY: %zu and %zu", key[0], key[1]);
+    printf("\nAnd Size %zu\n", key_len);
+    printf("\nCipher Size %zu\n", ciph_len);
+    printf("---Cipher---\n");
+    for (j = 0; j < message_len; j++) {
+      printf("%zu\t", ciph[j]);
+    }
+    printf("\n");
+    printf("---Message---\n");
+    print_string(message, message_len);
+    printf("\n Calculated from pow=%zu\tmod=%zu\n",key[1], key[0]);
   }
-  printf("\n");
+
+
 
   writeFile(output_file, message, message_len, UCHAR);
   

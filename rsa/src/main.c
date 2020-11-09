@@ -34,7 +34,7 @@ main(int argc, char **argv)
 	/*
 	 * Get arguments
 	 */
-	while ((opt = getopt(argc, argv, "i:o:k:degh:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:o:k:degh:v")) != -1) {
 		switch (opt) {
 		case 'i':
 			input_file = strdup(optarg);
@@ -56,6 +56,10 @@ main(int argc, char **argv)
 		case 'g':
 			/* if op_mode == 2 the tool performs keygen */
 			op_mode = 2;
+			break;
+		case 'v':
+			/* if verbose == 1 the tool prints info */
+			setVerbose(1);
 			break;
 		case 'h':
 		default:

@@ -1,6 +1,5 @@
 #ifndef _RSA_H
 #define _RSA_H
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,8 +9,10 @@
 #include <math.h>
 
 
-# define RSA_SIEVE_LIMIT 255
+#define RSA_SIEVE_LIMIT 255
 
+void setVerbose(int);
+int isVerbose();
 /*
  * Sieve of Eratosthenes Algorithm
  * https://en.wikipedia.org/wiki/Sieve_of_Eratosthenes
@@ -54,7 +55,7 @@ gcd(int , int);
  * ret: 'e'
  */
 size_t
-choose_e(size_t, size_t*);
+choose_e(size_t, size_t*,size_t);
 
 
 /*

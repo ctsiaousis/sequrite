@@ -4,7 +4,7 @@ CCFLAGS = -O2 -Wall -pedantic
 OBJFILES = main.o rsa.o utils.o
 LIBS := -lm
 
-TARGET = assign_3
+TARGET = rsa_tool
 
 
 all: $(TARGET)

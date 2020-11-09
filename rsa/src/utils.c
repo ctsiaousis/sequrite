@@ -50,9 +50,9 @@ void print_string(unsigned char *data, size_t len) {
 void usage(void) {
   printf("\n"
          "Usage:\n"
-         "    ./assign_3 -g -v\n"
-         "    ./assign_3 -i in_file -o out_file -k key_file [-d | -e]\n"
-         "    ./assign_3 -h\n");
+         "    ./rsa_tool -g \n"
+         "    ./rsa_tool -i in_file -o out_file -k key_file [-d | -e]\n"
+         "    ./rsa_tool -h\n");
   printf("\n"
          "Options:\n"
          " -i    path    Path to input file\n"
@@ -61,7 +61,7 @@ void usage(void) {
          " -d            Decrypt input and store results to output\n"
          " -e            Encrypt input and store results to output\n"
          " -g            Generates a keypair and saves to 2 files\n"
-         " -v            Verbose output."
+         " -v            Verbose output.\n"
          " -h            This help message\n");
   exit(EXIT_FAILURE);
 }

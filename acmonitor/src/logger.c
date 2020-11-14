@@ -123,21 +123,38 @@ int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t us
     struct  tm tm = *localtime(&T);
     char* fingerPrint = createFileFingerprint(contents, cont_len, T);
     int i;
-    int numberedFingerPrint[MD5_DIGEST_LENGTH];
 
-    printf("# ---------------- Entry Start ----------------\n");
-    printf("filename -> %s\n", absPath);
-	printf("userID -> %d\n",userID);
-    printf("Date -> %02d/%02d/%04d\n",tm.tm_mday, tm.tm_mon+1, tm.tm_year+1900);
-    printf("Time -> %02d:%02d:%02d\n",tm.tm_hour, tm.tm_min, tm.tm_sec);
-    printf("Access -> %d\n",access);
-    printf("Fingerprint -> ");
+    char s[64], fN[256], uI[64], d[64], t[64], ac[64], fP[128], af[64], e[64];
+    sprintf(s,"# ---------------- Entry Start ----------------\n");
+    sprintf(fN,"filename -> %s\n", absPath);
+	sprintf(uI,"userID -> %d\n",userID);
+    sprintf(d,"Date -> %02d/%02d/%04d\n",tm.tm_mday, tm.tm_mon+1, tm.tm_year+1900);
+    sprintf(t,"Time -> %02d:%02d:%02d\n",tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(ac,"Access -> %d\n",access);
+    sprintf(fP,"Fingerprint -> ");
     for(i = 0; i < MD5_DIGEST_LENGTH; i++){
-        printf("%d",fingerPrint[i]);
+        sprintf(fP+strlen(fP),"%x ",(unsigned char)fingerPrint[i]);
     }
-    printf("\nActionFlag -> %d\n",flag);
-    printf("# ----------------- Entry End -----------------\n");
+    sprintf(af,"\nActionFlag -> %d\n",flag);
+    sprintf(e,"# ----------------- Entry End -----------------\n");
 
+    char entry[0xFFF];
+    printf("%s%s%s%s%s%s%s%s%s",s, fN, uI, d, t, ac, fP, af, e);
+    sprintf(entry,"%s%s%s%s%s%s%s%s%s",s, fN, uI, d, t, ac, fP, af, e);
+
+
+	FILE *original_fopen_ret;
+	FILE *(*original_fopen)(const char*, const char*);
+
+	/* call the original fopen function */
+	original_fopen = dlsym(RTLD_NEXT, "fopen");
+	original_fopen_ret = (*original_fopen)(logPath, "a");
+
+	size_t original_fwrite_ret;
+	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
+	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	original_fwrite_ret = (*original_fwrite)(entry, strlen(entry), 1, original_fopen_ret);
+    fclose(original_fopen_ret);
 	free(fingerPrint);
 	return 0;
 }

@@ -189,7 +189,6 @@
  */
 
 typedef struct entry ENT; /**< @brief Forward declaration */
-typedef struct FCB FCB;
 
 /** @brief A convenience typedef */
 typedef struct resource_list_node *rlnode_ptr;
@@ -211,7 +210,6 @@ typedef struct resource_list_node {
      */
   union {
     ENT *entry;
-    FCB *fcb;
     void *obj;
     rlnode_ptr node;
     intptr_t num;
@@ -474,7 +472,6 @@ static inline void rlist_select(rlnode *Lsrc, rlnode *Ldest,
 }
 
 /* @} rlists */
-
 
 
 #endif

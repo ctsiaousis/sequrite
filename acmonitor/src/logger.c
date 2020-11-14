@@ -17,7 +17,7 @@
 #include <pwd.h>
 #include "util.h"
 
-char *logPath = "/tmp/acLogger";
+char *logPath = "/tmp/file_logging.log";
 
 int fileExists(char *filepath){
   struct stat   buffer;   
@@ -75,28 +75,6 @@ char* getAbsPath(FILE *stream){
 		return filename;
     }
 	return NULL;
-}
-
-char* runBash(char *bash_cmd, int return_size){
-	char *buffer = malloc(return_size+1);
-	FILE *pipe;
-
-	printf("BASHCMD: %s\n",bash_cmd);
-	pipe = popen(bash_cmd, "r");
-
-	if (NULL == pipe) {
-	    perror("pipe");
-	    exit(1);
-	}
-
-	fread(buffer, return_size, sizeof(char), pipe);
-
-	buffer[return_size] = '\0'; 
-
-	pclose(pipe);
-
-  	printf("Subprocess finished. RES: %s\n",buffer);
-	return buffer;
 }
 
 char* executeMD5(char *data, size_t len, int* return_size){
@@ -194,6 +172,10 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	int access = 2, flag = 0;
 	size_t original_fwrite_ret;
 	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
+	   
+    /* call the original fwrite function */
+	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
 	/* add your code here */
 	/* ... */
 	uid_t userID =  getuid();
@@ -227,9 +209,6 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	appendEntryToLogfile(file_cont, cont_len, getAbsPath(stream), userID, T, access, flag);
 
     if(!flag){
-	    /* call the original fwrite function */
-	    original_fwrite = dlsym(RTLD_NEXT, "fwrite");
-	    original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
         free(file_cont);
         
     }

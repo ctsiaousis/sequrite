@@ -34,13 +34,13 @@ int main()
 		fclose(file);
 	}
 
-	file = fopen("/etc/test", "r");
-	if (file == NULL) 
-		printf("fopen error\n");
-	else {
-		bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
-		fclose(file);
-	}
+	// file = fopen("/etc/test", "r");
+	// if (file == NULL) 
+	// 	printf("fopen error\n");
+	// else {
+	// 	bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+	// 	fclose(file);
+	// }
 
 	/* add your code here */
 	/* ... */

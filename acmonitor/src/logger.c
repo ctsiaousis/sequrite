@@ -99,17 +99,12 @@ char* runBash(char *bash_cmd, int return_size){
 	return buffer;
 }
 
-char* executeMD5(char *absPath, char *timestamp, int* return_size){
-
-	// unsigned char *MD5(const unsigned char *d, unsigned long n,
-    //               unsigned char *md);
-
- 	// int MD5_Init(MD5_CTX *c);
- 	// int MD5_Update(MD5_CTX *c, const void *data,
-    //               unsigned long len);
- 	// int MD5_Final(unsigned char *md, MD5_CTX *c);
-
-
+char* executeMD5(char *data, size_t len, int* return_size){
+    unsigned char *md = malloc(MD5_DIGEST_LENGTH);
+    *return_size = MD5_DIGEST_LENGTH;
+    MD5((unsigned char*)data, len, md);
+    printf("MD5 : \t %2X\n",md);
+    return (char*)md;
 }
 
 char* createFileFingerprint(char *contents, size_t len, time_t T){
@@ -121,13 +116,14 @@ char* createFileFingerprint(char *contents, size_t len, time_t T){
             tm.tm_min, tm.tm_sec);
 
     int size;
-    // executeMD5(absPath, timestamp, &size);
-	return NULL;
+	return executeMD5(signature, len+16, &size);
 }
 
 int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t userID, time_t T,int access,int flag){
     struct  tm tm = *localtime(&T);
     char* fingerPrint = createFileFingerprint(contents, cont_len, T);
+    int i;
+    int numberedFingerPrint[MD5_DIGEST_LENGTH];
 
     printf("# ---------------- Entry Start ----------------\n");
     printf("filename -> %s\n", absPath);
@@ -135,8 +131,11 @@ int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t us
     printf("Date -> %02d/%02d/%04d\n",tm.tm_mday, tm.tm_mon+1, tm.tm_year+1900);
     printf("Time -> %02d:%02d:%02d\n",tm.tm_hour, tm.tm_min, tm.tm_sec);
     printf("Access -> %d\n",access);
-    printf("Fingerprint -> %s\n",fingerPrint);
-    printf("ActionFlag -> %d\n",flag);
+    printf("Fingerprint -> ");
+    for(i = 0; i < MD5_DIGEST_LENGTH; i++){
+        printf("%d",fingerPrint[i]);
+    }
+    printf("\nActionFlag -> %d\n",flag);
     printf("# ----------------- Entry End -----------------\n");
 
 	free(fingerPrint);
@@ -160,9 +159,6 @@ fopen(const char *path, const char *mode)
 
 	/* add your code here */
 	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
 	uid_t userID =  getuid();
 	time_t T= time(NULL);
 
@@ -181,26 +177,45 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	int access = 2, flag = 0;
 	size_t original_fwrite_ret;
 	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
-
-	/* call the original fwrite function */
-	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
-	original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
-
-
 	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
 	/* ... */
 	uid_t userID =  getuid();
 	time_t T= time(NULL);
 
-	createLogFile();
+    struct stat sb;
     size_t  cont_len  = 0;
-    char*   file_cont = readFile(stream, &cont_len);
+    char*   file_cont = "";
 
+    if (stat(getAbsPath(stream), &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Mode:                     %lo (octal)\n",
+            (unsigned long) sb.st_mode);
+    printf("Link count:               %ld\n", (long) sb.st_nlink);
+    printf("Ownership:                UID=%ld   GID=%ld\n",
+            (long) sb.st_uid, (long) sb.st_gid);
+    printf("Last status change:       %s", ctime(&sb.st_ctime));
+    printf("Last file access:         %s", ctime(&sb.st_atime));
+    printf("Last file modification:   %s", ctime(&sb.st_mtime));
+
+    if(userID != sb.st_uid && userID != sb.st_gid && userID != 0){
+        flag = 1;
+    }else{
+        file_cont = readFile(stream, &cont_len);
+    }
+
+	createLogFile();
 	appendEntryToLogfile(file_cont, cont_len, getAbsPath(stream), userID, T, access, flag);
 
+    if(!flag){
+	    /* call the original fwrite function */
+	    original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	    original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
+        free(file_cont);
+        
+    }
 	return original_fwrite_ret;
 }
 

@@ -58,13 +58,12 @@ void createLogFile(){
 char* getAbsPath(FILE *stream){
 	if (stream){
 		int fno = fileno(stream);
-    	int MAXSIZE = 0xFFF;
     	char proclnk[0xFFF];
     	char *filename = malloc(0xFFF);
         sprintf(proclnk, "/proc/self/fd/%d", fno);
 		ssize_t r;
 
-        r = readlink(proclnk, filename, MAXSIZE);
+        r = readlink(proclnk, filename, 0xFFF);
         if (r < 0)
         {
             perror("read link error: ");

@@ -39,12 +39,13 @@ typedef struct entry {
 
 void usage(void);
 void countLines(char*, int, size_t*);
-void list_unauthorized_accesses(FILE *log);
-void list_file_modifications(FILE *log, char *file_to_scan);
+void list_unauthorized_accesses(ENT **, size_t);
+void list_file_modifications(ENT **, size_t , char *);
 myD* createDate(char*);
 myT* createTime(char*);
 ENT* createEntry(char**);
 ENT** populateLogs(FILE *, size_t*);
+int get_pwd_path(char* argv_0,char*);
 
 
 
@@ -53,6 +54,11 @@ int main(int argc, char *argv[]){
 	FILE *log;
 	if (argc < 2)
 		usage();
+	
+    // char *pwd_path = malloc(0xFFF);
+	// int pwd_path_len = get_pwd_path(argv[0],pwd_path);
+	// printf("PWD\"%s\"\n", pwd_path);
+	// strcat(pwd_path, "/another.log");
 
 	char* log_path = "/tmp/file_logging.log";
 	log = fopen(log_path, "r");
@@ -64,28 +70,14 @@ int main(int argc, char *argv[]){
 	size_t entries_size; 
 	ENT **myEntries = populateLogs(log, &entries_size);
 	printf("i have %zu entries",entries_size);
-	// size_t i;
-	// for(i = 0; i < entries_size; i+=10){
-	// 	printf("\n%s\n",myEntries[i]->file);
-	// 	printf("\n%s\n",myEntries[i]->fingerprint);
-	// 	printf("\n%d\n",myEntries[i]->uid);
-	// 	printf("\n%d\n",myEntries[i]->date->day);
-	// 	printf("\n%d\n",myEntries[i]->date->month);
-	// 	printf("\n%d\n",myEntries[i]->date->year);
-	// 	printf("\n%d\n",myEntries[i]->time->hour);
-	// 	printf("\n%d\n",myEntries[i]->time->minute);
-	// 	printf("\n%d\n",myEntries[i]->time->second);
-	// 	printf("\n%d\n",myEntries[i]->action_denied);
-	// 	printf("\n%d\n",myEntries[i]->access_type);
-	// }
 
 	while ((ch = getopt(argc, argv, "hi:m")) != -1) {
 		switch (ch) {		
 		case 'i':
-			list_file_modifications(log, optarg);
+			list_file_modifications(myEntries, entries_size, optarg);
 			break;
 		case 'm':
-			list_unauthorized_accesses(log);
+			list_unauthorized_accesses(myEntries, entries_size);
 			break;
 		default:
 			usage();
@@ -108,20 +100,53 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 
-void usage(void)
-{
-	printf(
-	       "\n"
-	       "usage:\n"
-	       "\t./acmonitor \n"
-		   "Options:\n"
-		   "-m, Prints malicious users\n"
-		   "-i <filename>, Prints table of users that modified "
-		   "the file <filename> and the number of modifications\n"
-		   "-h, Help message\n\n"
-		   );
 
-	exit(1);
+void list_unauthorized_accesses(ENT ** entries, size_t en_size){
+	size_t i, j;
+	int exists;
+	int malUsrs[en_size][2];
+	int distinctUsrs = 0;
+
+	for(i = 0; i < en_size; i++){
+		if(entries[i]->action_denied == 1){
+
+			for(j = 0; j < distinctUsrs; j++){
+				if(malUsrs[j][0] == entries[i]->uid ){
+					malUsrs[j][1]++;
+					exists = 1;
+					break;
+				}
+			}
+
+			if(!exists){
+				malUsrs[distinctUsrs][0] = entries[i]->uid;
+				malUsrs[distinctUsrs][1] = 1; //first atempt
+				distinctUsrs++;
+			}
+			exists = 0; //for next iteration
+		}
+	}
+
+	printf("\n USRID \t|\t ATTEMPTS\n");
+	for(i = 0; i < distinctUsrs; i++){
+		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
+	}
+	return;
+
+}
+
+
+void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
+{
+
+	/* add your code here */
+	/* ... */
+	/* ... */
+	/* ... */
+	/* ... */
+
+	return;
+
 }
 
 
@@ -142,76 +167,75 @@ void countLines(char *bash_cmd, int buffer_len, size_t *ret){
 	buffer[buffer_len] = '\0'; 
 
 	pclose(pipe);
-
+	// printf("TST: %s",buffer);
 	sscanf(buffer, "%zu", ret);
 	free(buffer);
 	return;
 }
 
+/*
+ * Reads the logfile, and parses it. Creates entries
+ * and returns them as an entry table.
+ *
+ */
+ENT** populateLogs(FILE *log, size_t* entries_size){
+	char *buffer;
+    size_t filelen;
+    fseek(log, 0, SEEK_END);
+    filelen = ftell(log);
+    rewind(log);
+	/* Read whole file, save it to buffer */
+    buffer = (char *)malloc((filelen + 1) * sizeof(char));
+	fread(buffer, filelen, 1, log);
+    if( filelen == 0){
+        buffer[0] = '\0';
+    }
+	/* Exec in shell "wc -l < logfile" */
+	size_t log_lines;
+	countLines("wc -l < /tmp/file_logging.log", 32, &log_lines);
+    printf("\n\nLOGLINES: %zu\n",log_lines);
+	/* Allocate entry table and prepare to parse buffer */
+	ENT** entries = malloc(sizeof(ENT*)*(log_lines/(ENTRY_ELEMENTS+2)));
+	size_t line_counter = 0;
+	size_t entry_counter = 0;
+    regex_t regex;
+    int reg_val, i;
+	char *mValue[ENTRY_ELEMENTS] = {"","","","","","",""};
 
-void list_unauthorized_accesses(FILE *log)
-{
+	/* 
+	 * just to be safe, duplicate the buffer to another pointer.
+	 * it is now easier to use buffer in parallel if needed.
+	 */
+	char *line_pointer = strdup(buffer);
+	char *line = strsep(&line_pointer, "\n");
+	
+	while(line) {
+		//set up regular expression
+		//to check if line contains "Start"
+    	reg_val = regcomp(&regex,"Start",0);
+		reg_val = regexec(&regex, line, 0, NULL, 0);
 
-	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
+		if(reg_val == 0){ //new entry
+		 	//line++
+   			line = strsep(&line_pointer, "\n");
 
-	return;
+			for(i = 0; i < ENTRY_ELEMENTS; i++){
+				mValue[i] = (strchr(line,'>')+2);
+				//line++
+   				line  = strsep(&line_pointer, "\n");
+			}
+			entries[entry_counter] = createEntry(mValue);
+			entry_counter += 1;
+		}
+		//line++
+   		line  = strsep(&line_pointer, "\n");
+	}
 
-}
+	*entries_size = entry_counter;
 
-
-void list_file_modifications(FILE *log, char *file_to_scan)
-{
-
-	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
-
-	return;
-
-}
-
-myD* createDate(char* value){
-	int day, month, year;
-
-	char *line = strtok(strdup(value), "/");
-	sscanf(line,"%d",&day);
-
-	line = strtok(NULL, "/");
-	sscanf(line,"%d",&month);
-
-	line = strtok(NULL, "/");
-	sscanf(line,"%d",&year);
-
-	myD* ret_date = malloc(sizeof(myD));
-	ret_date->day = day;
-	ret_date->month = month;
-	ret_date->year = year;
-	return ret_date;
-}
-
-myT* createTime(char* value){
-	int hour, minute, second;
-
-	char *line = strtok(strdup(value), ":");
-	sscanf(line,"%d",&hour);
-
-	line = strtok(NULL, ":");
-	sscanf(line,"%d",&minute);
-
-	line = strtok(NULL, ":");
-	sscanf(line,"%d",&second);
-
-	myT* ret_time = malloc(sizeof(myD));
-	ret_time->hour = hour;
-	ret_time->minute = minute;
-	ret_time->second = second;
-	return ret_time;
+	free(buffer);
+	free(line_pointer); //strdup returnes malloced string
+    return entries;
 }
 
 ENT* createEntry(char* values[ENTRY_ELEMENTS]){
@@ -236,57 +260,66 @@ ENT* createEntry(char* values[ENTRY_ELEMENTS]){
 	return my_entry;
 }
 
-ENT** populateLogs(FILE *log, size_t* entries_size){
-	char *buffer;
-    size_t filelen;
-    fseek(log, 0, SEEK_END);          // Jump to the end of the file
-    filelen = ftell(log);             // Get the current byte offset in the file
-    rewind(log);                      // Jump back to the beginning of the file
-  
-    buffer = (char *)malloc((filelen + 1) * sizeof(char));
-	fread(buffer, filelen, 1, log); // Read in the entire file
-    if( filelen == 0){
-        buffer[0] = '\0';
+myD* createDate(char* value){
+	int day, month, year;
+
+	char *line = strtok(strdup(value), "/");
+	sscanf(line,"%d",&day);
+	line = strtok(NULL, "/");
+	sscanf(line,"%d",&month);
+	line = strtok(NULL, "/");
+	sscanf(line,"%d",&year);
+
+	myD* ret_date = malloc(sizeof(myD));
+	ret_date->day = day;
+	ret_date->month = month;
+	ret_date->year = year;
+	return ret_date;
+}
+
+myT* createTime(char* value){
+	int hour, minute, second;
+
+	char *line = strtok(strdup(value), ":");
+	sscanf(line,"%d",&hour);
+	line = strtok(NULL, ":");
+	sscanf(line,"%d",&minute);
+	line = strtok(NULL, ":");
+	sscanf(line,"%d",&second);
+
+	myT* ret_time = malloc(sizeof(myD));
+	ret_time->hour = hour;
+	ret_time->minute = minute;
+	ret_time->second = second;
+	return ret_time;
+}
+
+/* Note that argv[0] should be passed */
+int get_pwd_path(char* argv_0,char *pwd_path){
+	ssize_t r = readlink("/proc/self/exe", pwd_path, 0xFFF);
+	if (r < 0) {
+        perror("read link error: ");
+		pwd_path = NULL;
+        return -1;
     }
-	// printf("%s\n\n",buffer);
+	int exe_name_len = strlen(argv_0+2);
+	int pwd_path_len = strlen(pwd_path) - exe_name_len - 1;
+	pwd_path[pwd_path_len] = '\0';
+	return pwd_path_len;
+}
 
-	size_t log_lines;
-	countLines("wc -l < /tmp/file_logging.log", 32, &log_lines);
-    printf("\n\nLOGLINES: %zu\n",log_lines);
+void usage(void)
+{
+	printf(
+	       "\n"
+	       "usage:\n"
+	       "\t./acmonitor \n"
+		   "Options:\n"
+		   "-m, Prints malicious users\n"
+		   "-i <filename>, Prints table of users that modified "
+		   "the file <filename> and the number of modifications\n"
+		   "-h, Help message\n\n"
+		   );
 
-	ENT** entries = malloc(sizeof(ENT*)*(log_lines/(ENTRY_ELEMENTS+2)));
-	size_t line_counter = 0;
-	size_t entry_counter = 0;
-	char *line_pointer = strdup(buffer);
-	char *line = strsep(&line_pointer, "\n");
-
-    regex_t regex;
-    int reg_val, i;
-	char *mValue[ENTRY_ELEMENTS] = {"","","","","","",""};
-	
-	while(line) {
-    	reg_val = regcomp(&regex,"Start",0); //set up regular expression
-		reg_val = regexec(&regex, line, 0, NULL, 0); //to check if line contains "Start"
-
-		if(reg_val == 0){ //new entry
-		 	//line++
-   			line = strsep(&line_pointer, "\n");
-
-			for(i = 0; i < ENTRY_ELEMENTS; i++){
-				mValue[i] = (strchr(line,'>')+2);
-				//line++
-   				line  = strsep(&line_pointer, "\n");
-			}
-			entries[entry_counter] = createEntry(mValue);
-			entry_counter += 1;
-		}
-		//line++
-   		line  = strsep(&line_pointer, "\n");
-	}
-
-	*entries_size = entry_counter;
-
-	free(buffer);
-	free(line_pointer); //strdup returnes malloced string
-    return entries;
+	exit(1);
 }

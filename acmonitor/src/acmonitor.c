@@ -22,6 +22,21 @@ struct entry {
 
 };
 
+struct myTime {
+
+	int hour;
+	int minute;
+	int second;
+
+};
+
+struct myDate {
+
+	int day;
+	int month;
+	int year;
+
+};
 
 void
 usage(void)

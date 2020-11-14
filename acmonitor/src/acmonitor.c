@@ -55,10 +55,7 @@ int main(int argc, char *argv[]){
 	if (argc < 2)
 		usage();
 	
-    // char *pwd_path = malloc(0xFFF);
-	// int pwd_path_len = get_pwd_path(argv[0],pwd_path);
-	// printf("PWD\"%s\"\n", pwd_path);
-	// strcat(pwd_path, "/another.log");
+
 
 	char* log_path = "/tmp/file_logging.log";
 	log = fopen(log_path, "r");
@@ -69,11 +66,13 @@ int main(int argc, char *argv[]){
 
 	size_t entries_size; 
 	ENT **myEntries = populateLogs(log, &entries_size);
-	printf("i have %zu entries",entries_size);
+	printf("i have %zu entries\n",entries_size);
 
+	// printf("PWD\"%s\"\n", absIn);
 	while ((ch = getopt(argc, argv, "hi:m")) != -1) {
 		switch (ch) {		
 		case 'i':
+			// strcat(pwd_path, optarg);
 			list_file_modifications(myEntries, entries_size, optarg);
 			break;
 		case 'm':
@@ -109,7 +108,7 @@ void list_unauthorized_accesses(ENT ** entries, size_t en_size){
 
 	for(i = 0; i < en_size; i++){
 		if(entries[i]->action_denied == 1){
-
+			exists = 0;
 			for(j = 0; j < distinctUsrs; j++){
 				if(malUsrs[j][0] == entries[i]->uid ){
 					malUsrs[j][1]++;
@@ -123,28 +122,49 @@ void list_unauthorized_accesses(ENT ** entries, size_t en_size){
 				malUsrs[distinctUsrs][1] = 1; //first atempt
 				distinctUsrs++;
 			}
-			exists = 0; //for next iteration
 		}
 	}
 
-	printf("\n UID \t|\t ATTEMPTS\n");
+	printf("\n UID \t| ATTEMPTS\n");
 	for(i = 0; i < distinctUsrs; i++){
+		if(malUsrs[i][1] < 7) continue;
 		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
 	}
 	return;
-
 }
 
 
-void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
-{
+void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan){
+	char *abs_path = realpath(file_to_scan, NULL);
+	printf("%s\n",abs_path);
+	size_t i, j;
+	int exists;
+	int malUsrs[en_size][2];
+	int distinctUsrs = 0;
 
-	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
+	for(i = 0; i < en_size; i++){
+		if(strcmp(entries[i]->file, abs_path)){
+			exists = 0;
+			for(j = 0; j < distinctUsrs; j++){
+				if(malUsrs[j][0] == entries[i]->uid ){
+					malUsrs[j][1]++;
+					exists = 1;
+					break;
+				}
+			}
 
+			if(!exists){
+				malUsrs[distinctUsrs][0] = entries[i]->uid;
+				malUsrs[distinctUsrs][1] = 1; //first atempt
+				distinctUsrs++;
+			}
+		}
+	}
+
+	printf("\n UID \t| ATTEMPTS\n");
+	for(i = 0; i < distinctUsrs; i++){
+		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
+	}
 	return;
 
 }
@@ -296,13 +316,14 @@ myT* createTime(char* value){
 
 /* Note that argv[0] should be passed */
 int get_pwd_path(char* argv_0,char *pwd_path){
+	printf("ARGV[0]: %s",argv_0);
 	ssize_t r = readlink("/proc/self/exe", pwd_path, 0xFFF);
 	if (r < 0) {
         perror("read link error: ");
 		pwd_path = NULL;
         return -1;
     }
-	int exe_name_len = strlen(argv_0+2);
+	int exe_name_len = strlen(argv_0) - 2;
 	int pwd_path_len = strlen(pwd_path) - exe_name_len - 1;
 	pwd_path[pwd_path_len] = '\0';
 	return pwd_path_len;

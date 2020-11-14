@@ -127,7 +127,7 @@ void list_unauthorized_accesses(ENT ** entries, size_t en_size){
 		}
 	}
 
-	printf("\n USRID \t|\t ATTEMPTS\n");
+	printf("\n UID \t|\t ATTEMPTS\n");
 	for(i = 0; i < distinctUsrs; i++){
 		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
 	}

@@ -2,22 +2,22 @@
 
 #include <time.h>
 #include <stdio.h>
-#include <sys/wait.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <errno.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <openssl/md5.h>
+#include <sys/stat.h>
+#include <sys/acl.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <grp.h>
 #include "util.h"
 
-char *logPath = "/tmp/file_logging.log";
+char *logPath = "./file_logging.log";
 
 int fileExists(char *filepath){
   struct stat   buffer;   
@@ -52,6 +52,14 @@ void createLogFile(){
 			return;
 		}
 		printf("\nCreated Log File at: \t%s\n",logPath);
+        char mode[] = "0666";
+        int i;
+        i = strtol(mode, 0, 8);
+        if (chmod (logPath,i) < 0){
+            perror("chmod ");
+            exit(1);
+        }
+		printf("And made it accessibl by all.\n");
 	}
 }
 
@@ -64,9 +72,9 @@ char* getAbsPath(FILE *stream){
 		ssize_t r;
 
         r = readlink(proclnk, filename, 0xFFF);
-        if (r < 0)
-        {
-            perror("read link error: ");
+        if (r < 0) {
+            printf("/proc/self/fd/%d", fno);
+            perror("read link error ");
             exit(1);
         }
         filename[r] = '\0';
@@ -80,7 +88,7 @@ char* executeMD5(char *data, size_t len, int* return_size){
     unsigned char *md = malloc(MD5_DIGEST_LENGTH);
     *return_size = MD5_DIGEST_LENGTH;
     MD5((unsigned char*)data, len, md);
-    printf("MD5 : \t %2X\n",md);
+    // printf("MD5 : \t %2X\n",md);
     return (char*)md;
 }
 
@@ -150,17 +158,45 @@ fopen(const char *path, const char *mode)
 	original_fopen = dlsym(RTLD_NEXT, "fopen");
 	original_fopen_ret = (*original_fopen)(path, mode);
 
-
 	/* add your code here */
 	/* ... */
 	uid_t userID =  getuid();
 	time_t T= time(NULL);
 
-	createLogFile();
+	/* Get file STATS */
+    struct stat sb;
+    if (stat(realpath(path, NULL), &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
     size_t  cont_len  = 0;
-    char*   file_cont = readFile(original_fopen_ret, &cont_len);
-
-	appendEntryToLogfile(file_cont, cont_len, getAbsPath(original_fopen_ret), userID, T, access, flag);
+    char*   file_cont = "";
+    if( userID != sb.st_uid && getegid() != sb.st_gid ){
+        /* Check permissions */
+        char octal_mode[6];
+        sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
+        /* OWNER: mode[3] | GROUP: mode[4] | OTHERS: mode[5] */
+        if((octal_mode[5] != 6 && octal_mode[5] != 7 && octal_mode[5] != 2 && octal_mode[5] != 3)
+            && ( (mode[0] == 'w') || (mode[1] == 'w') ) )
+        {
+            printf("CALMODE: %c,\tSTATMODE: %c \tw\n",mode[0], octal_mode[5]);
+            flag = 1;
+        }    
+        if((octal_mode[5] < 4) && ( (mode[0] == 'r') || (mode[1] == 'r') ) )
+        {
+            //others don't have READ permissions
+            flag = 1;
+        }else{
+            file_cont = readFile(original_fopen_ret, &cont_len);
+        }
+    }else{
+        // we OWN the damn file
+        file_cont = readFile(original_fopen_ret, &cont_len);
+    }
+    
+    /* Create log if not exists, and apend entry to it */
+	createLogFile();
+	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
 	return original_fopen_ret;
 }
 
@@ -175,47 +211,52 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     /* call the original fwrite function */
 	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
 	original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
-	/* add your code here */
-	/* ... */
-	uid_t userID =  getuid();
+
+	/* Get UID time and filePath */
+	uid_t userID  =  getuid();
 	time_t T= time(NULL);
+    char *absPath = getAbsPath(stream);
 
+	/* Get file STATS */
     struct stat sb;
-    size_t  cont_len  = 0;
-    char*   file_cont = "";
-
-    if (stat(getAbsPath(stream), &sb) == -1) {
+    if (stat(absPath, &sb) == -1) {
         perror("stat");
         exit(EXIT_FAILURE);
     }
-
-    printf("Mode:                     %lo (octal)\n",
-            (unsigned long) sb.st_mode);
-    printf("Link count:               %ld\n", (long) sb.st_nlink);
-    printf("Ownership:                UID=%ld   GID=%ld\n",
-            (long) sb.st_uid, (long) sb.st_gid);
-    printf("Last status change:       %s", ctime(&sb.st_ctime));
-    printf("Last file access:         %s", ctime(&sb.st_atime));
-    printf("Last file modification:   %s", ctime(&sb.st_mtime));
-
-    if(userID != sb.st_uid && userID != sb.st_gid && userID != 0){
-        flag = 1;
+    size_t  cont_len  = 0;
+    char*   file_cont = "";
+    if( userID != sb.st_uid && getegid() != sb.st_gid ){
+        /* Check permissions */
+        char mode[6];
+        sprintf(mode,"%lo",(unsigned long)sb.st_mode);
+        /* OWNER: mode[3] | GROUP: mode[4] | OTHERS: mode[5] */
+        if(mode[5] != 6 && mode[5] != 7 && mode[5] != 2 && mode[5] != 3){
+            //others don't have WRITE permissions
+            flag = 1;
+        }    
+        if(mode[5] >= 4){
+            //others have READ permissions
+            file_cont = readFile(stream, &cont_len);
+        }
     }else{
+        // we OWN the damn file
         file_cont = readFile(stream, &cont_len);
     }
 
+    /* Create log if not exists, and apend entry to it */
 	createLogFile();
-	appendEntryToLogfile(file_cont, cont_len, getAbsPath(stream), userID, T, access, flag);
+	appendEntryToLogfile(file_cont, cont_len, absPath, userID, T, access, flag);
 
     if(!flag){
         free(file_cont);
-        
     }
+    free(absPath);
 	return original_fwrite_ret;
 }
 
 
-	/* For creating directory
+/* For creating directory
+
 	struct passwd *pw = getpwuid(getuid());
 	const char *homedir = pw->pw_dir;
 	char filepath[128];
@@ -229,7 +270,8 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     	mkdir(dir, 0755);
     }
     //directory $HOME/.cache/acLogger exists/
-	*/
+
+*/
 
 
 /* For getting md5 through pipes and bash
@@ -333,4 +375,26 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     return NULL;
 	// *return_size = size;
 	// return buffer;
+*/
+
+
+/* GIDs
+
+    // gid_t group;
+    // long ngroups_max = sysconf(_SC_NGROUPS_MAX);
+    // int ngroups = getgroups(ngroups_max, &group);
+    // gid_t groups[ngroups];
+
+    // printf("\n%s\n%s\n%d\n",getlogin(),absPath,getegid());
+    // if (getgrouplist(getlogin(), getegid(), groups, &ngroups) == -1) {
+    //     fprintf(stderr, "getgrouplist() returned -1; ngroups = %d\n",
+    //             ngroups);
+    //     exit(EXIT_FAILURE);
+    // }
+    // // Display list of retrieved groups, along with group names
+    // fprintf(stderr, "ngroups = %d\n", ngroups);
+    // for (int j = 0; j < ngroups; j++) {
+    //     printf("%d\t", groups[j]);
+    // }
+
 */

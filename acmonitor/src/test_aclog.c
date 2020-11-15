@@ -25,7 +25,16 @@ int main()
 		}
 
 	}
+	for (i = 0; i < 10; i++) {
 
+		file = fopen(filenames[i], "r");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			fclose(file);
+		}
+
+	}
 	file = fopen("/etc/os-release", "r");
 	if (file == NULL) 
 		printf("fopen error\n");

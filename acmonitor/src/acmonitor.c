@@ -57,7 +57,7 @@ int main(int argc, char *argv[]){
 	
 
 
-	char* log_path = "/tmp/file_logging.log";
+	char* log_path = "./file_logging.log";
 	log = fopen(log_path, "r");
 	if (log == NULL) {
 		printf("Error opening log file \"%s\"\n", log_path);
@@ -143,7 +143,7 @@ void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
 	int distinctUsrs = 0;
 
 	for(i = 0; i < en_size; i++){
-		if(strcmp(entries[i]->file, abs_path)){
+		if(strcmp(entries[i]->file, abs_path) == 0){
 			exists = 0;
 			for(j = 0; j < distinctUsrs; j++){
 				if(malUsrs[j][0] == entries[i]->uid ){
@@ -212,7 +212,7 @@ ENT** populateLogs(FILE *log, size_t* entries_size){
     }
 	/* Exec in shell "wc -l < logfile" */
 	size_t log_lines;
-	countLines("wc -l < /tmp/file_logging.log", 32, &log_lines);
+	countLines("wc -l < ./file_logging.log", 32, &log_lines);
     printf("\n\nLOGLINES: %zu\n",log_lines);
 	/* Allocate entry table and prepare to parse buffer */
 	ENT** entries = malloc(sizeof(ENT*)*(log_lines/(ENTRY_ELEMENTS+2)));
@@ -253,6 +253,9 @@ ENT** populateLogs(FILE *log, size_t* entries_size){
 
 	*entries_size = entry_counter;
 
+	if(entry_counter != (log_lines/(ENTRY_ELEMENTS+2))){
+		printf("Possible error in log parsing.");
+	}
 	free(buffer);
 	free(line_pointer); //strdup returnes malloced string
     return entries;

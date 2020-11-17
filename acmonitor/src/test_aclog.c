@@ -51,11 +51,4 @@ int main()
 		fclose(file);
 	}
 
-	/* add your code here */
-	/* ... */
-	/* ... */
-	/* ... */
-	/* ... */
-
-
 }

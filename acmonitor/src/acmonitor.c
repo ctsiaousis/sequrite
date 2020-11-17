@@ -211,6 +211,7 @@ void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
 			// printf("%s\n",fingerPrints[i][j]);
 		}
 		printf(" %d \t|\t %d\n",malUsrs[i][0], distinctFprint);
+		printf("-- Without fingerprint checking: %d\n",malUsrs[i][1]);
 	}
 	return;
 

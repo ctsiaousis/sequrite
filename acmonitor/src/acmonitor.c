@@ -103,32 +103,56 @@ int main(int argc, char *argv[]){
 void list_unauthorized_accesses(ENT ** entries, size_t en_size){
 	size_t i, j;
 	int exists;
-	int malUsrs[en_size][2];
+	size_t malUsrs[en_size][2];
+	char *fileNames[en_size][en_size];
 	int distinctUsrs = 0;
 
 	for(i = 0; i < en_size; i++){
 		if(entries[i]->action_denied == 1){
 			exists = 0;
+
 			for(j = 0; j < distinctUsrs; j++){
-				if(malUsrs[j][0] == entries[i]->uid ){
+				if(malUsrs[j][0] == entries[i]->uid ){ // User Exists
 					malUsrs[j][1]++;
+					fileNames[j][malUsrs[j][1]-1] = entries[i]->file;
 					exists = 1;
 					break;
 				}
 			}
 
-			if(!exists){
+			if(!exists){ // New User
 				malUsrs[distinctUsrs][0] = entries[i]->uid;
 				malUsrs[distinctUsrs][1] = 1; //first atempt
+
+				fileNames[distinctUsrs][malUsrs[distinctUsrs][1]-1] = entries[i]->file;
 				distinctUsrs++;
 			}
 		}
 	}
-
+	/*
+	 * We now have two tables. One with distinct UserIDs and total attempts,
+	 * and one that for each user has all the filenames.
+	 */
+	size_t k;
 	printf("\n UID \t| ATTEMPTS\n");
 	for(i = 0; i < distinctUsrs; i++){
-		if(malUsrs[i][1] < 7) continue;
-		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
+		if(malUsrs[i][1] < 7) continue; //User has less than 7 malicious atempts
+
+		int distinctFName = 0;
+		// check how many DISTINCT files are in the filename[USER]
+		for(j = 0; j < malUsrs[i][1]; j++){
+			for(k = 0; k < j; k++){
+				if(strcmp(fileNames[i][j], fileNames[i][k]) == 0){
+					break;
+				}
+			}
+			if(j == k)
+				distinctFName++;
+			// printf("%s\n",fileNames[i][j]);
+		}
+
+		if(distinctFName < 7) continue;//User has les than 7 DISTINCT malicious atempts
+		printf(" %zu \t|\t %d\n",malUsrs[i][0], distinctFName);
 	}
 	return;
 }
@@ -140,30 +164,53 @@ void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
 	size_t i, j;
 	int exists;
 	int malUsrs[en_size][2];
+	char *fingerPrints[en_size][en_size];
 	int distinctUsrs = 0;
 
 	for(i = 0; i < en_size; i++){
-		if(strcmp(entries[i]->file, abs_path) == 0){
+		if( (strcmp(entries[i]->file, abs_path) == 0) &&
+			(entries[i]->action_denied == 1) )
+		{
 			exists = 0;
+
 			for(j = 0; j < distinctUsrs; j++){
-				if(malUsrs[j][0] == entries[i]->uid ){
+				if(malUsrs[j][0] == entries[i]->uid ){ // User Exists
 					malUsrs[j][1]++;
+
+					fingerPrints[j][malUsrs[j][1]-1] = entries[i]->fingerprint;
 					exists = 1;
 					break;
 				}
 			}
 
-			if(!exists){
+			if(!exists){ // New User
 				malUsrs[distinctUsrs][0] = entries[i]->uid;
 				malUsrs[distinctUsrs][1] = 1; //first atempt
+
+				fingerPrints[distinctUsrs][malUsrs[distinctUsrs][1]-1] = entries[i]->fingerprint;
 				distinctUsrs++;
 			}
 		}
 	}
 
+	size_t k;
 	printf("\n UID \t| ATTEMPTS\n");
 	for(i = 0; i < distinctUsrs; i++){
-		printf(" %d \t|\t %d\n",malUsrs[i][0], malUsrs[i][1]);
+
+		int distinctFprint = 0;
+		// check how many DISTINCT files are in the filename[USER]
+		for(j = 0; j < malUsrs[i][1]; j++){
+			for(k = 0; k < j; k++){
+				if(strcmp(fingerPrints[i][j], fingerPrints[i][k]) == 0){
+					break;
+				}
+			}
+			if(j == k)
+				distinctFprint++;
+				
+			// printf("%s\n",fingerPrints[i][j]);
+		}
+		printf(" %d \t|\t %d\n",malUsrs[i][0], distinctFprint);
 	}
 	return;
 

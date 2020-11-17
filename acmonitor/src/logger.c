@@ -159,7 +159,6 @@ fopen(const char *path, const char *mode)
 	original_fopen_ret = (*original_fopen)(path, mode);
 
 	/* add your code here */
-	/* ... */
 	uid_t userID =  getuid();
 	time_t T= time(NULL);
 
@@ -171,7 +170,7 @@ fopen(const char *path, const char *mode)
     }
     size_t  cont_len  = 0;
     char*   file_cont = "";
-    if( userID != sb.st_uid && getegid() != sb.st_gid ){
+    if( userID != sb.st_uid || getegid() != sb.st_gid ){
         /* Check permissions */
         char octal_mode[6];
         sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
@@ -181,22 +180,25 @@ fopen(const char *path, const char *mode)
         {
             printf("CALMODE: %c,\tSTATMODE: %c \tw\n",mode[0], octal_mode[5]);
             flag = 1;
-        }    
-        if((octal_mode[5] < 4) && ( (mode[0] == 'r') || (mode[1] == 'r') ) )
-        {
+        }   
+        else if((octal_mode[5] < 4) && ( (mode[0] == 'r') || (mode[1] == 'r') ) ){
             //others don't have READ permissions
             flag = 1;
         }else{
-            file_cont = readFile(original_fopen_ret, &cont_len);
+            file_cont = (access==0)?"":readFile(original_fopen_ret, &cont_len);
         }
     }else{
         // we OWN the damn file
-        file_cont = readFile(original_fopen_ret, &cont_len);
+        file_cont = (access==0)?"":readFile(original_fopen_ret, &cont_len);
     }
     
     /* Create log if not exists, and apend entry to it */
 	createLogFile();
 	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
+
+    if (flag == 0 && access == 1) {
+        free(file_cont);
+    }
 	return original_fopen_ret;
 }
 
@@ -207,10 +209,6 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	int access = 2, flag = 0;
 	size_t original_fwrite_ret;
 	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
-	   
-    /* call the original fwrite function */
-	original_fwrite = dlsym(RTLD_NEXT, "fwrite");
-	original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
 
 	/* Get UID time and filePath */
 	uid_t userID  =  getuid();
@@ -225,7 +223,7 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
     size_t  cont_len  = 0;
     char*   file_cont = "";
-    if( userID != sb.st_uid && getegid() != sb.st_gid ){
+    if( userID != sb.st_uid || getegid() != sb.st_gid ){
         /* Check permissions */
         char mode[6];
         sprintf(mode,"%lo",(unsigned long)sb.st_mode);
@@ -249,6 +247,9 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     if(!flag){
         free(file_cont);
+        /* call the original fwrite function */
+	    original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	    original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
     }
     free(absPath);
 	return original_fwrite_ret;

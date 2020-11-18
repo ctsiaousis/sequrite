@@ -144,6 +144,32 @@ int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t us
 	return 0;
 }
 
+int checkPermissions(uid_t userID, gid_t groupID, struct stat sb, const char *octal_mode, const char *mMode){
+    /* OWNER: octal_mode[3] | GROUP: octal_mode[4] | OTHERS: octal_mode[5] */
+    if( userID == sb.st_uid ){
+        /* OWNER */
+        if(mMode[0] == 'w' || mMode[1] == 'w'){
+            return (octal_mode[3] != '6' && octal_mode[3] != '7' && octal_mode[3] != '2' && octal_mode[3] != '3')?1:0;
+        }else{
+            return (octal_mode[3] < '4')?1:0;
+        }
+    }else if( groupID == sb.st_gid){
+        /* GROUP */
+        if(mMode[0] == 'w' || mMode[1] == 'w'){
+            return (octal_mode[4] != '6' && octal_mode[4] != '7' && octal_mode[4] != '2' && octal_mode[4] != '3')?1:0;
+        }else{
+            return (octal_mode[4] < '4')?1:0;
+        }
+    }else{
+        /* OTHERS */
+        if(mMode[0] == 'w' || mMode[1] == 'w'){
+            return (octal_mode[5] != '6' && octal_mode[5] != '7' && octal_mode[5] != '2' && octal_mode[5] != '3')?1:0;
+        }else{
+            return (octal_mode[5] < '4')?1:0;
+        }
+    }
+}
+
 FILE *
 fopen(const char *path, const char *mode) 
 {
@@ -168,29 +194,18 @@ fopen(const char *path, const char *mode)
         perror("stat");
         exit(EXIT_FAILURE);
     }
+
+    /* Check permissions */
+    char octal_mode[6];
+    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
+    printf("OCTAL: %s\t%c\t%c\n",octal_mode,mode[0],mode[1]);
+    
+    flag = checkPermissions(userID, getegid(), sb, octal_mode, mode);
     size_t  cont_len  = 0;
     char*   file_cont = "";
-    if( userID != sb.st_uid || getegid() != sb.st_gid ){
-        /* Check permissions */
-        char octal_mode[6];
-        sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
-        /* OWNER: mode[3] | GROUP: mode[4] | OTHERS: mode[5] */
-        if((octal_mode[5] != 6 && octal_mode[5] != 7 && octal_mode[5] != 2 && octal_mode[5] != 3)
-            && ( (mode[0] == 'w') || (mode[1] == 'w') ) )
-        {
-            printf("CALMODE: %c,\tSTATMODE: %c \tw\n",mode[0], octal_mode[5]);
-            flag = 1;
-        }   
-        else if((octal_mode[5] < 4) && ( (mode[0] == 'r') || (mode[1] == 'r') ) ){
-            //others don't have READ permissions
-            flag = 1;
-        }else{
-            file_cont = (access==0)?"":readFile(original_fopen_ret, &cont_len);
-        }
-    }else{
-        // we OWN the damn file
-        file_cont = (access==0)?"":readFile(original_fopen_ret, &cont_len);
-    }
+
+    file_cont = (access==0 || flag == 1)?"":readFile(original_fopen_ret, &cont_len);
+    
     
     /* Create log if not exists, and apend entry to it */
 	createLogFile();
@@ -221,25 +236,13 @@ fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         perror("stat");
         exit(EXIT_FAILURE);
     }
+    char octal_mode[6];
+    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
+    flag = checkPermissions(userID, getegid(), sb, octal_mode, "w");
     size_t  cont_len  = 0;
     char*   file_cont = "";
-    if( userID != sb.st_uid || getegid() != sb.st_gid ){
-        /* Check permissions */
-        char mode[6];
-        sprintf(mode,"%lo",(unsigned long)sb.st_mode);
-        /* OWNER: mode[3] | GROUP: mode[4] | OTHERS: mode[5] */
-        if(mode[5] != 6 && mode[5] != 7 && mode[5] != 2 && mode[5] != 3){
-            //others don't have WRITE permissions
-            flag = 1;
-        }    
-        if(mode[5] >= 4){
-            //others have READ permissions
-            file_cont = readFile(stream, &cont_len);
-        }
-    }else{
-        // we OWN the damn file
-        file_cont = readFile(stream, &cont_len);
-    }
+
+    file_cont = (flag == 1)?"":readFile(stream, &cont_len);
 
     /* Create log if not exists, and apend entry to it */
 	createLogFile();

@@ -25,6 +25,57 @@ int main()
 			fclose(file);
 		}
 	}
+
+	char *mode = "0040";
+	int m;
+
+/* Some tests in on GROUP permissions */
+	for (i = 0; i < 10; i++) {
+    	m = strtol(mode, 0, 8);
+		if (chmod (filenames[i],m) < 0){
+			perror("CHMOD");
+        	exit(1);
+    	}
+	}
+	/*This will raise a flag*/
+	for (i = 0; i < 10; i++) {
+		file = fopen(filenames[i], "rw");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+			fclose(file);
+		}
+	}
+	/*This will raise a not*/
+	for (i = 0; i < 10; i++) {
+		file = fopen(filenames[i], "r");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			fclose(file);
+		}
+	}
+	/*This will raise a flag*/
+	for (i = 0; i < 10; i++) {
+		file = fopen(filenames[i], "a");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			bytes = fwrite(filenames[i], strlen(filenames[i]), 1, file);
+			fclose(file);
+		}
+	}
+
+	mode = "0000";
+	for (i = 0; i < 10; i++) {
+    	m = strtol(mode, 0, 8);
+		if (chmod (filenames[i],m) < 0){
+			perror("CHMOD");
+        	exit(1);
+    	}
+	}
+	/*This will raise a flag*/
 	for (i = 0; i < 10; i++) {
 		file = fopen(filenames[i], "r");
 		if (file == NULL) 
@@ -34,8 +85,25 @@ int main()
 		}
 	}
 
-	char mode[] = "0400";
-	int m;
+	mode = "0666";
+	for (i = 0; i < 10; i++) {
+    	m = strtol(mode, 0, 8);
+		if (chmod (filenames[i],m) < 0){
+			perror("CHMOD");
+        	exit(1);
+    	}
+	}
+	/*This will not*/
+	for (i = 0; i < 10; i++) {
+		file = fopen(filenames[i], "r");
+		if (file == NULL) 
+			printf("fopen error\n");
+		else {
+			fclose(file);
+		}
+	}
+
+/* Some tests in on GROUP permissions */
 	for (i = 0; i < 10; i++) {
     	m = strtol(mode, 0, 8);
 		if (chmod (filenames[i],m) < 0){
@@ -54,6 +122,7 @@ int main()
 		}
 	}
 
+/* Some tests in excisting root files */
 	file = fopen("/etc/os-release", "r");
 	if (file == NULL) 
 		printf("fopen error\n");

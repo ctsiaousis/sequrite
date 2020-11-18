@@ -163,21 +163,21 @@ int checkPermissions(uid_t userID, gid_t groupID, struct stat sb, const char *oc
     /* OWNER: octal_mode[3] | GROUP: octal_mode[4] | OTHERS: octal_mode[5] */
     if( userID == sb.st_uid ){
         /* OWNER */
-        if(mMode[0] == 'w' || mMode[1] == 'w'){
+        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
             return (octal_mode[3] != '6' && octal_mode[3] != '7' && octal_mode[3] != '2' && octal_mode[3] != '3')?1:0;
         }else{
             return (octal_mode[3] < '4')?1:0;
         }
     }else if( groupID == sb.st_gid){
         /* GROUP */
-        if(mMode[0] == 'w' || mMode[1] == 'w'){
+        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
             return (octal_mode[4] != '6' && octal_mode[4] != '7' && octal_mode[4] != '2' && octal_mode[4] != '3')?1:0;
         }else{
             return (octal_mode[4] < '4')?1:0;
         }
     }else{
         /* OTHERS */
-        if(mMode[0] == 'w' || mMode[1] == 'w'){
+        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
             return (octal_mode[5] != '6' && octal_mode[5] != '7' && octal_mode[5] != '2' && octal_mode[5] != '3')?1:0;
         }else{
             return (octal_mode[5] < '4')?1:0;

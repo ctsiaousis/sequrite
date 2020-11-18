@@ -19,89 +19,104 @@
 
 char *logPath = "./file_logging.log";
 
-int fileExists(char *filepath){
-  struct stat   buffer;   
-  return (stat(filepath, &buffer) == 0);
-}
 
-char *readFile(FILE *fileptr, size_t *size) {
-  char *buffer;
-  size_t filelen;
+size_t fwrite(const void *, size_t, size_t, FILE *);
+FILE *fopen(const char *, const char *);
+int checkPermissions(uid_t, gid_t, struct stat, const char *, const char *);
+int appendEntryToLogfile(char*, size_t, char *, uid_t, time_t, int, int);
+char* createFileFingerprint(char *, size_t, time_t);
+char* executeMD5(char *, size_t, int*);
+char* getAbsPath(FILE *);
+void createLogFile();
+char *readFile(FILE *, size_t *sze);
+int fileExists(char *);
 
-  fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
-  filelen = ftell(fileptr);             // Get the current byte offset in the file
-  rewind(fileptr);                      // Jump back to the beginning of the file
 
-  buffer = (char *)malloc((filelen + 1) * sizeof(char));
-  fread(buffer, filelen, 1, fileptr); // Read in the entire file
 
-//  DO NOT fclose(fileptr); here, or we loose the FILE* and fail readlink
-
-  if( filelen == 0){
-      buffer[0] = '\0';
-  }
-  *size = filelen;
-  return buffer;
-}
-
-void createLogFile(){
-	if( !fileExists(logPath) ){
-		FILE* fp = fopen(logPath, "w");
-		if( fp == NULL ){
-			printf("\nCould not create Log File at: \t%s\n",logPath);
-			return;
-		}
-		printf("\nCreated Log File at: \t%s\n",logPath);
-        char mode[] = "0666";
-        int i;
-        i = strtol(mode, 0, 8);
-        if (chmod (logPath,i) < 0){
-            perror("chmod ");
-            exit(1);
-        }
-		printf("And made it accessibl by all.\n");
+FILE *fopen(const char *path, const char *mode) 
+{
+	int access = 0, flag = 0;
+	if( fileExists((char*)path) ){
+		access = 1;
 	}
-}
+	FILE *original_fopen_ret;
+	FILE *(*original_fopen)(const char*, const char*);
 
-char* getAbsPath(FILE *stream){
-	if (stream){
-		int fno = fileno(stream);
-    	char proclnk[0xFFF];
-    	char *filename = malloc(0xFFF);
-        sprintf(proclnk, "/proc/self/fd/%d", fno);
-		ssize_t r;
+	/* call the original fopen function */
+	original_fopen = dlsym(RTLD_NEXT, "fopen");
+	original_fopen_ret = (*original_fopen)(path, mode);
 
-        r = readlink(proclnk, filename, 0xFFF);
-        if (r < 0) {
-            printf("/proc/self/fd/%d", fno);
-            perror("read link error ");
-            exit(1);
-        }
-        filename[r] = '\0';
-        // printf("filename -> %s\n", filename);
-		return filename;
+	/* add your code here */
+	uid_t userID =  getuid();
+	time_t T= time(NULL);
+
+	/* Get file STATS */
+    struct stat sb;
+    if (stat(realpath(path, NULL), &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
     }
-	return NULL;
+
+    /* Check permissions */
+    char octal_mode[6];
+    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
+    printf("OCTAL: %s\t%c\t%c\n",octal_mode,mode[0],mode[1]);
+    
+    flag = checkPermissions(userID, getegid(), sb, octal_mode, mode);
+    size_t  cont_len  = 0;
+    char*   file_cont = "";
+
+    file_cont = (access==0 || flag == 1)?"":readFile(original_fopen_ret, &cont_len);
+    
+    
+    /* Create log if not exists, and apend entry to it */
+	createLogFile();
+	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
+
+    if (flag == 0 && access == 1) {
+        free(file_cont);
+    }
+	return original_fopen_ret;
 }
 
-char* executeMD5(char *data, size_t len, int* return_size){
-    unsigned char *md = malloc(MD5_DIGEST_LENGTH);
-    *return_size = MD5_DIGEST_LENGTH;
-    MD5((unsigned char*)data, len, md);
-    // printf("MD5 : \t %2X\n",md);
-    return (char*)md;
-}
 
-char* createFileFingerprint(char *contents, size_t len, time_t T){
-    struct  tm tm = *localtime(&T);
-	char signature[len+16];
-	sprintf(signature,"%s\n%02d%02d%04d%02d%02d%02d", 
-            contents, tm.tm_mday, tm.tm_mon+1, 
-            tm.tm_year+1900, tm.tm_hour, 
-            tm.tm_min, tm.tm_sec);
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) 
+{
+	int access = 2, flag = 0;
+	size_t original_fwrite_ret;
+	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
 
-    int size;
-	return executeMD5(signature, len+16, &size);
+	/* Get UID time and filePath */
+	uid_t userID  =  getuid();
+	time_t T= time(NULL);
+    char *absPath = getAbsPath(stream);
+
+	/* Get file STATS */
+    struct stat sb;
+    if (stat(absPath, &sb) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
+    char octal_mode[6];
+    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
+    flag = checkPermissions(userID, getegid(), sb, octal_mode, "w");
+    size_t  cont_len  = 0;
+    char*   file_cont = "";
+
+    file_cont = (flag == 1)?"":readFile(stream, &cont_len);
+
+    /* Create log if not exists, and apend entry to it */
+	createLogFile();
+	appendEntryToLogfile(file_cont, cont_len, absPath, userID, T, access, flag);
+
+    if(!flag){
+        free(file_cont);
+        /* call the original fwrite function */
+	    original_fwrite = dlsym(RTLD_NEXT, "fwrite");
+	    original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
+    }
+    free(absPath);
+	return original_fwrite_ret;
 }
 
 int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t userID, time_t T,int access,int flag){
@@ -170,94 +185,93 @@ int checkPermissions(uid_t userID, gid_t groupID, struct stat sb, const char *oc
     }
 }
 
-FILE *
-fopen(const char *path, const char *mode) 
-{
-	int access = 0, flag = 0;
-	if( fileExists((char*)path) ){
-		access = 1;
+
+int fileExists(char *filepath){
+  struct stat   buffer;   
+  return (stat(filepath, &buffer) == 0);
+}
+
+char *readFile(FILE *fileptr, size_t *size) {
+  char *buffer;
+  size_t filelen;
+
+  fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
+  filelen = ftell(fileptr);             // Get the current byte offset in the file
+  rewind(fileptr);                      // Jump back to the beginning of the file
+
+  buffer = (char *)malloc((filelen + 1) * sizeof(char));
+  fread(buffer, filelen, 1, fileptr); // Read in the entire file
+
+//  DO NOT fclose(fileptr); here, or we loose the FILE* and fail readlink
+
+  if( filelen == 0){
+      buffer[0] = '\0';
+  }
+  *size = filelen;
+  return buffer;
+}
+
+void createLogFile(){
+	if( !fileExists(logPath) ){
+		FILE* fp = fopen(logPath, "w");
+		if( fp == NULL ){
+			printf("\nCould not create Log File at: \t%s\n",logPath);
+			return;
+		}
+		printf("\nCreated Log File at: \t%s\n",logPath);
+        char mode[] = "0666";
+        int i;
+        i = strtol(mode, 0, 8);
+        if (chmod (logPath,i) < 0){
+            perror("chmod ");
+            exit(1);
+        }
+		printf("And made it accessibl by all.\n");
 	}
-	FILE *original_fopen_ret;
-	FILE *(*original_fopen)(const char*, const char*);
-
-	/* call the original fopen function */
-	original_fopen = dlsym(RTLD_NEXT, "fopen");
-	original_fopen_ret = (*original_fopen)(path, mode);
-
-	/* add your code here */
-	uid_t userID =  getuid();
-	time_t T= time(NULL);
-
-	/* Get file STATS */
-    struct stat sb;
-    if (stat(realpath(path, NULL), &sb) == -1) {
-        perror("stat");
-        exit(EXIT_FAILURE);
-    }
-
-    /* Check permissions */
-    char octal_mode[6];
-    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
-    printf("OCTAL: %s\t%c\t%c\n",octal_mode,mode[0],mode[1]);
-    
-    flag = checkPermissions(userID, getegid(), sb, octal_mode, mode);
-    size_t  cont_len  = 0;
-    char*   file_cont = "";
-
-    file_cont = (access==0 || flag == 1)?"":readFile(original_fopen_ret, &cont_len);
-    
-    
-    /* Create log if not exists, and apend entry to it */
-	createLogFile();
-	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
-
-    if (flag == 0 && access == 1) {
-        free(file_cont);
-    }
-	return original_fopen_ret;
 }
 
 
-size_t 
-fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) 
-{
-	int access = 2, flag = 0;
-	size_t original_fwrite_ret;
-	size_t (*original_fwrite)(const void*, size_t, size_t, FILE*);
+char* getAbsPath(FILE *stream){
+	if (stream){
+		int fno = fileno(stream);
+    	char proclnk[0xFFF];
+    	char *filename = malloc(0xFFF);
+        sprintf(proclnk, "/proc/self/fd/%d", fno);
+		ssize_t r;
 
-	/* Get UID time and filePath */
-	uid_t userID  =  getuid();
-	time_t T= time(NULL);
-    char *absPath = getAbsPath(stream);
-
-	/* Get file STATS */
-    struct stat sb;
-    if (stat(absPath, &sb) == -1) {
-        perror("stat");
-        exit(EXIT_FAILURE);
+        r = readlink(proclnk, filename, 0xFFF);
+        if (r < 0) {
+            printf("/proc/self/fd/%d", fno);
+            perror("read link error ");
+            exit(1);
+        }
+        filename[r] = '\0';
+        // printf("filename -> %s\n", filename);
+		return filename;
     }
-    char octal_mode[6];
-    sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
-    flag = checkPermissions(userID, getegid(), sb, octal_mode, "w");
-    size_t  cont_len  = 0;
-    char*   file_cont = "";
-
-    file_cont = (flag == 1)?"":readFile(stream, &cont_len);
-
-    /* Create log if not exists, and apend entry to it */
-	createLogFile();
-	appendEntryToLogfile(file_cont, cont_len, absPath, userID, T, access, flag);
-
-    if(!flag){
-        free(file_cont);
-        /* call the original fwrite function */
-	    original_fwrite = dlsym(RTLD_NEXT, "fwrite");
-	    original_fwrite_ret = (*original_fwrite)(ptr, size, nmemb, stream);
-    }
-    free(absPath);
-	return original_fwrite_ret;
+	return NULL;
 }
 
+char* executeMD5(char *data, size_t len, int* return_size){
+    unsigned char *md = malloc(MD5_DIGEST_LENGTH);
+    *return_size = MD5_DIGEST_LENGTH;
+    MD5((unsigned char*)data, len, md);
+    // printf("MD5 : \t %2X\n",md);
+    return (char*)md;
+}
+
+
+char* createFileFingerprint(char *contents, size_t len, time_t T){
+    struct  tm tm = *localtime(&T);
+	char signature[len+16];
+	sprintf(signature,"%s\n%02d%02d%04d%02d%02d%02d", 
+            contents, tm.tm_mday, tm.tm_mon+1, 
+            tm.tm_year+1900, tm.tm_hour, 
+            tm.tm_min, tm.tm_sec);
+
+    int size;
+	return executeMD5(signature, len+16, &size);
+}
 
 /* For creating directory
 

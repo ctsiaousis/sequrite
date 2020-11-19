@@ -168,8 +168,7 @@ void list_file_modifications(ENT ** entries, size_t en_size, char *file_to_scan)
 	int distinctUsrs = 0;
 
 	for(i = 0; i < en_size; i++){
-		if( (strcmp(entries[i]->file, abs_path) == 0) &&
-			(entries[i]->action_denied == 1) )
+		if( (strcmp(entries[i]->file, abs_path) == 0) )
 		{
 			exists = 0;
 

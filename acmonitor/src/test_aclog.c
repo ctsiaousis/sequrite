@@ -103,7 +103,6 @@ int main()
 		}
 	}
 
-/* Some tests in on GROUP permissions */
 	for (i = 0; i < 10; i++) {
     	m = strtol(mode, 0, 8);
 		if (chmod (filenames[i],m) < 0){
@@ -113,7 +112,7 @@ int main()
 	}
 
 	for (i = 0; i < 10; i++) {
-		file = fopen(filenames[i], "rw");
+		file = fopen(filenames[i], "a+");
 		if (file == NULL) 
 			printf("fopen error\n");
 		else {
@@ -137,7 +136,7 @@ int main()
 		fclose(file);
 	}
 
-	file = fopen("/etc/test", "w");
+	file = fopen("/etc/test", "w+");
 	if (file == NULL) 
 		printf("fopen error\n");
 	else {

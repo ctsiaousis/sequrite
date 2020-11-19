@@ -47,7 +47,7 @@ int main()
 			fclose(file);
 		}
 	}
-	/*This will raise a not*/
+	/*This will not*/
 	for (i = 0; i < 10; i++) {
 		file = fopen(filenames[i], "r");
 		if (file == NULL) 

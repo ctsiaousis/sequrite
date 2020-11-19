@@ -61,19 +61,19 @@ FILE *fopen(const char *path, const char *mode)
     char octal_mode[6];
     sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
     printf("OCTAL: %s\t%c\t%c\n",octal_mode,mode[0],mode[1]);
-    
     flag = checkPermissions(userID, getegid(), sb, octal_mode, mode);
+
     size_t  cont_len  = 0;
     char*   file_cont = "";
-
-    file_cont = (access==0 || flag == 1)?"":readFile(original_fopen_ret, &cont_len);
+    file_cont = (access == 0 || flag == 1 || original_fopen_ret == NULL)
+                ?"":readFile(original_fopen_ret, &cont_len);
     
     
     /* Create log if not exists, and apend entry to it */
 	createLogFile();
 	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
 
-    if (flag == 0 && access == 1) {
+    if (access == 1 && flag == 0 && original_fopen_ret != NULL) {
         free(file_cont);
     }
 	return original_fopen_ret;
@@ -161,28 +161,33 @@ int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t us
 
 int checkPermissions(uid_t userID, gid_t groupID, struct stat sb, const char *octal_mode, const char *mMode){
     /* OWNER: octal_mode[3] | GROUP: octal_mode[4] | OTHERS: octal_mode[5] */
-    if( userID == sb.st_uid ){
-        /* OWNER */
-        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
-            return (octal_mode[3] != '6' && octal_mode[3] != '7' && octal_mode[3] != '2' && octal_mode[3] != '3')?1:0;
-        }else{
-            return (octal_mode[3] < '4')?1:0;
-        }
-    }else if( groupID == sb.st_gid){
-        /* GROUP */
-        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
-            return (octal_mode[4] != '6' && octal_mode[4] != '7' && octal_mode[4] != '2' && octal_mode[4] != '3')?1:0;
-        }else{
-            return (octal_mode[4] < '4')?1:0;
-        }
-    }else{
+    int flag = 0;
         /* OTHERS */
-        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a'){
-            return (octal_mode[5] != '6' && octal_mode[5] != '7' && octal_mode[5] != '2' && octal_mode[5] != '3')?1:0;
+    if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a' || mMode[1] == '+'){
+        flag = (octal_mode[5] != '6' && octal_mode[5] != '7' && octal_mode[5] != '2' && octal_mode[5] != '3')?1:0;
+    }else{
+        flag = (octal_mode[5] < '4')?1:0;
+    }
+
+    if( groupID == sb.st_gid && flag == 1){ //check only if flag is raised before
+        /* GROUP */
+        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a' || mMode[1] == '+'){
+            flag = (octal_mode[4] != '6' && octal_mode[4] != '7' && octal_mode[4] != '2' && octal_mode[4] != '3')?1:0;
         }else{
-            return (octal_mode[5] < '4')?1:0;
+            flag = (octal_mode[4] < '4')?1:0;
         }
     }
+
+    if( userID == sb.st_uid && flag == 1){ //check only if flag is raised before
+        /* OWNER */
+        if(mMode[0] == 'w' || mMode[1] == 'w' || mMode[0] == 'a' || mMode[1] == 'a' || mMode[1] == '+'){
+            flag = (octal_mode[3] != '6' && octal_mode[3] != '7' && octal_mode[3] != '2' && octal_mode[3] != '3')?1:0;
+        }else{
+            flag = (octal_mode[3] < '4')?1:0;
+        }
+    }
+
+    return flag;
 }
 
 

@@ -40,7 +40,9 @@ typedef struct entry {
 void usage(void);
 void countLines(char*, int, size_t*);
 void list_unauthorized_accesses(ENT **, size_t);
-void list_file_modifications(ENT **, size_t , char *);
+void list_file_modifications(ENT **, size_t, char *);
+void list_last_minute(ENT **, size_t, char *);
+void list_ransomeware(ENT **, size_t);
 myD* createDate(char*);
 myT* createTime(char*);
 ENT* createEntry(char**);
@@ -69,7 +71,7 @@ int main(int argc, char *argv[]){
 	printf("i have %zu entries\n",entries_size);
 
 	// printf("PWD\"%s\"\n", absIn);
-	while ((ch = getopt(argc, argv, "hi:m")) != -1) {
+	while ((ch = getopt(argc, argv, "hi:v:me")) != -1) {
 		switch (ch) {		
 		case 'i':
 			// strcat(pwd_path, optarg);
@@ -77,6 +79,12 @@ int main(int argc, char *argv[]){
 			break;
 		case 'm':
 			list_unauthorized_accesses(myEntries, entries_size);
+			break;
+		case 'v':
+			list_last_minute(myEntries, entries_size, optarg);
+			break;
+		case 'e':
+			list_ransomeware(myEntries, entries_size);
 			break;
 		default:
 			usage();
@@ -99,6 +107,80 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 
+/*
+ * Prints the total number of files created in the last 20 minutes
+ */
+void list_last_minute(ENT ** entries, size_t en_size, char* num){
+	size_t lim = strtol(num, NULL, 10);
+
+	time_t fileCrTime, rawtime;
+	struct tm timeinfo;
+	size_t i;
+	int distinctFileCreations = 0;
+
+	for(i = 0; i < en_size; i++){
+		if(entries[i]->access_type == 0){
+			timeinfo.tm_mday = entries[i]->date->day;
+			timeinfo.tm_mon  = entries[i]->date->month - 1;
+			timeinfo.tm_year = entries[i]->date->year - 1900;
+			timeinfo.tm_hour = entries[i]->time->hour;
+			timeinfo.tm_min  = entries[i]->time->minute;
+			timeinfo.tm_sec  = entries[i]->time->second;
+			timeinfo.tm_isdst = 0;
+
+			rawtime = time(NULL);
+			fileCrTime = mktime(&timeinfo);
+			// printf("filename: \t %s.\n",entries[i]->file);
+			// printf("rawtime \t %zu.\n",rawtime);
+			// printf("fileCrTime \t %zu.\n",fileCrTime);
+
+			if((rawtime - fileCrTime) < 1200){
+				distinctFileCreations++;
+			}
+		}
+	}
+
+	printf("There were %d file(s) creations the last 20 minutes.\n",distinctFileCreations);
+	if(distinctFileCreations >= lim){
+		printf("This is suspicious behavior.\n");
+	}else {
+		printf("No suspicious behavior.\n");
+	}
+}
+
+void list_ransomeware(ENT ** entries, size_t en_size){
+	size_t i, j;
+	char *fileNames[en_size];
+	int distinctFiles = 0, exists = 0;
+
+	for(i = 0; i < en_size; i++){
+		exists = 0;
+		for(j = 0; j < distinctFiles; j++){
+			if(strcmp(fileNames[j], entries[i]->file) == 0){ // FName Exists
+				exists = 1;
+				break;
+			}
+		}
+		if(!exists){ // New FileName
+			fileNames[distinctFiles] = entries[i]->file;
+			distinctFiles++;
+		}
+	}
+
+	char *ransFNames[distinctFiles];
+	int infected = 0;
+	for(i = 0; i < distinctFiles; i++){
+		char *str = fileNames[i];
+		if(strlen(str) > 8 && !strcmp(str + strlen(str) - 8, ".encrypt")){
+			str[strlen(str) - 8] = '\0';
+			ransFNames[infected++] = str;
+		}
+	}
+	printf("Detected that ransomware infected the following file(s):\n");
+	for(j = 0; j < infected; j++){
+		printf("%s\n",ransFNames[j]);
+	}
+}
 
 void list_unauthorized_accesses(ENT ** entries, size_t en_size){
 	size_t i, j;
@@ -389,6 +471,9 @@ void usage(void)
 		   "-m, Prints malicious users\n"
 		   "-i <filename>, Prints table of users that modified "
 		   "the file <filename> and the number of modifications\n"
+		   "-v <limit>, checks if there was a suspicious behavior of file "
+		   "creations in the last 20 minutes, based on the limit given.\n"
+		   "-e, Prints all the files that were encrypted by the ransomware.\n"
 		   "-h, Help message\n\n"
 		   );
 

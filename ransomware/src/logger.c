@@ -16,7 +16,7 @@
 #include <pwd.h>
 #include <grp.h>
 
-char *logPath = "./file_logging.log";
+char *logPath = "../file_logging.log";
 
 
 size_t fwrite(const void *, size_t, size_t, FILE *);
@@ -59,7 +59,6 @@ FILE *fopen(const char *path, const char *mode)
     /* Check permissions */
     char octal_mode[6];
     sprintf(octal_mode,"%lo",(unsigned long)sb.st_mode);
-    printf("OCTAL: %s\t%c\t%c\n",octal_mode,mode[0],mode[1]);
     flag = checkPermissions(userID, getegid(), sb, octal_mode, mode);
 
     size_t  cont_len  = 0;
@@ -90,6 +89,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 	time_t T= time(NULL);
     char *absPath = getAbsPath(stream);
 
+
 	/* Get file STATS */
     struct stat sb;
     if (stat(absPath, &sb) == -1) {
@@ -119,6 +119,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t userID, time_t T,int access,int flag){
+    if( strcmp(absPath, "/dev/null") == 0 ){
+        return 0; //we dont care about this file cause we use it to suspend terminal output
+    }
     struct  tm tm = *localtime(&T);
     char* fingerPrint = createFileFingerprint(contents, cont_len, T);
     int i;
@@ -132,13 +135,13 @@ int appendEntryToLogfile(char*contents, size_t cont_len, char *absPath, uid_t us
     sprintf(ac,"Access -> %d\n",access);
     sprintf(fP,"Fingerprint -> ");
     for(i = 0; i < MD5_DIGEST_LENGTH; i++){
-        sprintf(fP+strlen(fP),"%x ",(unsigned char)fingerPrint[i]);
+        sprintf(fP+strlen(fP),"%x",(unsigned char)fingerPrint[i]);
     }
     sprintf(af,"\nActionFlag -> %d\n",flag);
     sprintf(e,"# ----------------- Entry End -----------------\n");
 
     char entry[0xFFF];
-    printf("%s%s%s%s%s%s%s%s%s",s, fN, uI, d, t, ac, fP, af, e);
+    // printf("%s%s%s%s%s%s%s%s%s",s, fN, uI, d, t, ac, fP, af, e);
     sprintf(entry,"%s%s%s%s%s%s%s%s%s",s, fN, uI, d, t, ac, fP, af, e);
 
 
@@ -222,7 +225,6 @@ void createLogFile(){
 			printf("\nCould not create Log File at: \t%s\n",logPath);
 			return;
 		}
-		printf("\nCreated Log File at: \t%s\n",logPath);
         char mode[] = "0666";
         int i;
         i = strtol(mode, 0, 8);
@@ -230,7 +232,6 @@ void createLogFile(){
             perror("chmod ");
             exit(1);
         }
-		printf("And made it accessibl by all.\n");
 	}
 }
 

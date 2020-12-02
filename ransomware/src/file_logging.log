@@ -1,0 +1,153 @@
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/file_logging.log
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 0
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 0
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 0
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /etc/ssl/openssl.cnf
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 1
+Fingerprint -> 1725a036b6e4ecb52eba43faff28eb7
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 1
+Fingerprint -> 54d306e6721f420a0da3736e24de151
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 0
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 13bc9524e540af62a4cb3221d39a2d0
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_0.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 13bc9524e540af62a4cb3221d39a2d0
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /etc/ssl/openssl.cnf
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 1
+Fingerprint -> 1725a036b6e4ecb52eba43faff28eb7
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 1
+Fingerprint -> a92a3f234a4a40e6e1f8b06461cb8255
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 0
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 3cda132dada2c5aecb82dce5ba826cf
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 5f37a8b1de7ec8aa4ec78b6f41cc924
+ActionFlag -> 0
+# ----------------- Entry End -----------------
+# ---------------- Entry Start ----------------
+filename -> /home/kalikanjaro/docs/projects/sequrite/ransomware/src/testFiles/file_1.txt.encrypt
+userID -> 1001
+Date -> 02/12/2020
+Time -> 18:43:07
+Access -> 2
+Fingerprint -> 5f37a8b1de7ec8aa4ec78b6f41cc924
+ActionFlag -> 0
+# ----------------- Entry End -----------------

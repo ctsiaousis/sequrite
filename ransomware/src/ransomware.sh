@@ -18,7 +18,6 @@ unset LD_PRELOAD
 export LD_PRELOAD=../openSSLlogger.so
 j=0
 while [ $j -lt $numOfFiles ]; do
-ls
     openssl enc -aes-256-ecb -in "$dirName/file_$j.txt" -out "$dirName/file_$j.txt.encrypt" -k "1234" 2> /dev/null
     rm -f "$dirName/file_$j.txt"
     j=$(( j + 1 ))

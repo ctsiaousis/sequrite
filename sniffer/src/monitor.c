@@ -1,4 +1,5 @@
 #include "monitor.h"
+#include <netinet/in.h>
 #include <stdint.h>
 
 /*
@@ -7,35 +8,34 @@
  *
  */
 
-pcap_t *handle;
-static uint16_t previousSequenceNumber = 0;
-struct my_flow *head_flowList = NULL;
-struct globalStats* gStat = NULL;
-static volatile int breakLoop = 0;
+pcap_t *handle; //for network device (real or file)
+struct my_flow *head_flowList = NULL; //head of flow list
+struct globalStats* gStat = NULL; //for the aftermath
+
+//handking sigint
+static volatile int breakLoop = 0; 
 void intHandler(int dummy) {
     printf("\nGot your request master.\n"); 
     breakLoop = 1;
 }
 
+//this is the callback func of pcap_loop
 void processPacket(u_char *arg, const struct pcap_pkthdr* header, const u_char * packet){
     if( breakLoop ){
         pcap_breakloop(handle);
     }else{
         clear();
-        u_int16_t type = handle_ethernet(arg,header,packet);
+        u_int16_t type = handle_ethernet(header,packet);
         if(type == ETHERTYPE_IP){
             printf("----------------------------------------------------\n");
-            handle_IPv4(arg, header, packet);
+            handle_IPv4(header, packet);
             printf("----------------------------------------------------\n");
         }else if(type == ETHERTYPE_IPV6){
             printf("----------------------------------------------------\n");
-            handle_IPv6(arg, header, packet);
+            handle_IPv6(header, packet);
             printf("----------------------------------------------------\n");
 
         }
-        // int *counter = (int *)arg;
-        // printf("Processed Packets: %d\n", ++(*counter)); 
-        // printf("Received Packet Size: %d\n", header->len); 
         gStat->totalPackets++;
         printf("\nPress Ctrl-C to stop sniffing.");
         fflush(stdout);
@@ -46,91 +46,84 @@ void processPacket(u_char *arg, const struct pcap_pkthdr* header, const u_char *
 ////////////////////////////////////////////////////////////////////////////////////
 ///                          Header Handling Functions                           ///
 ////////////////////////////////////////////////////////////////////////////////////
-u_int16_t handle_ethernet(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char *packet){
+
+//returns the ethernet header type
+u_int16_t handle_ethernet(const struct pcap_pkthdr* pkthdr, const u_char *packet){
     struct ether_header *eptr = (struct ether_header *) packet;
     return ntohs(eptr->ether_type);
 }
 
-u_char* handle_IPv4(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char*packet){
+//handles IP version 4 packets
+u_char* handle_IPv4(const struct pcap_pkthdr* pkthdr,const u_char*packet){
     
     const struct my_ip* ip;
-    u_int ip_hlen,off,version;
-    char* srcIP = NULL;
-    char* dstIP = NULL;
+    u_int version;
+    char srcIP[INET_ADDRSTRLEN];
+    char dstIP[INET_ADDRSTRLEN];
     int dstPort, srcPort;
     int protocolDATAlen;
-    int len;
 
-    /* jump pass the ethernet header */
+    // jump after ethernet header
     ip = (struct my_ip*)(packet + sizeof(struct ether_header));
-    u_int protocHDRlength = pkthdr->len;
-    protocHDRlength -= sizeof(struct ether_header); 
-    len     = ntohs(ip->ip_len);
-    ip_hlen = IP_HL(ip); // IP header length
-    version = IP_V(ip); // IP version
-    /* check version */
-    if(version != 4 && version != 6){
-      fprintf(stdout,"Unknown version %d\n",version);
-      return NULL;
-    }
-    /* check header length */
-    if(ip_hlen < 5 ){
-        fprintf(stdout,"bad IPheader len %d \n",ip_hlen);
-        return NULL;
-    }
-    /* see if we have as much packet as we should */
-    if(protocHDRlength < len)
-        printf("\ntruncated IP - %d bytes missing\n",len - protocHDRlength);
 
-    /* Check to see if we have the first fragment */
-    // off = ntohs(ip->ip_off);
-    // if((off & 0x1fff) == 0 ){// no 1's in first 13 bits
-    srcIP = inet_ntoa(ip->ip_src);
+    u_int protocHDRlength = pkthdr->len;
+    protocHDRlength -= sizeof(struct ether_header);
+    version = IP_V(ip); // IP version
+
+    inet_ntop(AF_INET, &(ip->ip_src), srcIP, INET_ADDRSTRLEN);
+	inet_ntop(AF_INET, &(ip->ip_dst), dstIP, INET_ADDRSTRLEN);
     printf("IPsrc: \t\t%s\n", srcIP);
-    dstIP = inet_ntoa(ip->ip_dst);
     printf("IPdst: \t\t%s\n", dstIP);
     printf("version: \tIPv%d\n", version);
 
     if(ip->ip_p == IPPROTO_TCP){
+        //jump after ip header
         const struct tcphdr* tcp_header;
         tcp_header = (struct tcphdr*)(packet + ETHER_HDR_LEN + sizeof(struct my_ip));
+
         srcPort = ntohs(tcp_header->source);
         dstPort = ntohs(tcp_header->dest);
         protocHDRlength = protocHDRlength - sizeof(struct my_ip);
         protocolDATAlen = protocHDRlength - sizeof(struct tcphdr);
         uint16_t seqNo = ntohs(tcp_header->seq);
+        gStat->totalTcpPackets++;               // <- global variable
+        gStat->totalTcpBytes+= protocHDRlength; // <- global variable
+
         printTCP(srcPort,dstPort,protocHDRlength,protocolDATAlen,seqNo);
         addToFlowList(srcIP,dstIP,srcPort,dstPort,6,1,seqNo);
-        gStat->totalTcpPackets++; // <- global variable
-        gStat->totalTcpBytes+= protocHDRlength; // <- global variable
     }else if(ip->ip_p == IPPROTO_UDP){
+        //jump after ip header
         const struct udphdr* udp_header;
         udp_header = (struct udphdr*)(packet + ETHER_HDR_LEN + sizeof(struct my_ip));
+
         srcPort = ntohs(udp_header->source);
         dstPort = ntohs(udp_header->dest);
         protocHDRlength = protocHDRlength - sizeof(struct my_ip);
         protocolDATAlen = protocHDRlength - sizeof(struct udphdr);
+        gStat->totalUdpPackets++;               // <- global variable
+        gStat->totalUdpBytes+= protocHDRlength; // <- global variable
+
         printUDP(srcPort, dstPort, protocHDRlength, protocolDATAlen);
         addToFlowList(srcIP,dstIP,srcPort,dstPort,version, 0, 0);
-        gStat->totalUdpPackets++; // <- global variable
-        gStat->totalUdpBytes+= protocHDRlength; // <- global variable
     }else{
         fprintf(stdout,"IPv4::Unknown %d\n", ip->ip_p);
     }
-    // }
 
     return NULL;
 }
 
 
 /* Handle IPv6 header */
-u_char* handle_IPv6(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char*packet){
+u_char* handle_IPv6(const struct pcap_pkthdr* pkthdr,const u_char*packet){
     char srcIP[INET6_ADDRSTRLEN], dstIP[INET6_ADDRSTRLEN];
     struct ip6_hdr* ip6Header;
     int srcPort = 0, dstPort = 0;
     u_int protocolDATAlen = 0;
     u_int protocHDRlength = pkthdr->len;
     protocHDRlength -= sizeof(struct ether_header); 
+
+
+    // jump after ethernet header
     ip6Header = (struct ip6_hdr*)(packet + sizeof(struct ether_header));
     inet_ntop(AF_INET6, &(ip6Header->ip6_src), srcIP, INET6_ADDRSTRLEN);
 	inet_ntop(AF_INET6, &(ip6Header->ip6_dst), dstIP, INET6_ADDRSTRLEN);
@@ -140,30 +133,36 @@ u_char* handle_IPv6(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char*p
     printf("IPsrc: \t\t%s\n", srcIP);
     printf("IPdst: \t\t%s\n", dstIP);
     printf("version: \tIPv6\n");
+
     if(nextheader == IPPROTO_TCP){
+        //jump after ipv6 header
         struct tcphdr* tcp_header;
         tcp_header = (struct tcphdr*)(packet + ETHER_HDR_LEN + sizeof(struct ip6_hdr));
+
         srcPort = ntohs(tcp_header->source);
         dstPort = ntohs(tcp_header->dest);
         protocHDRlength = protocHDRlength - sizeof(struct ip6_hdr);
         protocolDATAlen = protocHDRlength - sizeof(struct tcphdr);
         uint16_t seqNo = ntohs(tcp_header->seq);
+        gStat->totalTcpPackets++;               // <- global variable
+        gStat->totalTcpBytes+=protocHDRlength; // <- global variable
+
         printTCP(srcPort,dstPort,protocHDRlength,protocolDATAlen,seqNo);
         addToFlowList(srcIP,dstIP,srcPort,dstPort,6,1,seqNo);
-        gStat->totalTcpPackets++; // <- global variable
-        gStat->totalTcpBytes+=protocHDRlength; // <- global variable
     }else if(nextheader == IPPROTO_UDP){
+        //jump after ipv6 header
 		const struct udphdr* udp_header;
         udp_header = (struct udphdr*)(packet + ETHER_HDR_LEN + sizeof(struct ip6_hdr));
+
         srcPort = ntohs(udp_header->source);
         dstPort = ntohs(udp_header->dest);
         protocHDRlength = protocHDRlength - sizeof(struct ip6_hdr);
         protocolDATAlen = protocHDRlength - sizeof(struct udphdr);
+        gStat->totalUdpPackets++;               // <- global variable
+        gStat->totalUdpBytes+=protocHDRlength; // <- global variable
+
         printUDP(srcPort, dstPort, protocHDRlength, protocolDATAlen);
         addToFlowList(srcIP,dstIP,srcPort,dstPort,6, 0, 0);
-
-        gStat->totalUdpPackets++; // <- global variable
-        gStat->totalUdpBytes+=protocHDRlength; // <- global variable
 	}else{
 		printf("IPv6::Unknown %d\n", nextheader);
     }
@@ -174,12 +173,14 @@ u_char* handle_IPv6(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char*p
 ////////////////////////////////////////////////////////////////////////////////////
 ///                            Flow Handling Functions                           ///
 ////////////////////////////////////////////////////////////////////////////////////
+
+//returns a 'my_flow' struct to be used as node in the list
 struct my_flow* initializeFlowNode(char *srcAddress, char *dstAddress, int srcPort, int dstPort, int version, int isTCP){
     struct my_flow* newNode = (struct my_flow*)my_malloc(sizeof(struct my_flow));
-    newNode->srcIP = (char*)my_malloc( INET_ADDRSTRLEN);
-    memcpy(newNode->srcIP, srcAddress, INET_ADDRSTRLEN);
-    newNode->dstIP = (char*)my_malloc( INET_ADDRSTRLEN);
-    memcpy(newNode->dstIP, dstAddress, INET_ADDRSTRLEN);
+    newNode->srcIP = (version==4)?my_malloc(INET_ADDRSTRLEN):my_malloc( INET6_ADDRSTRLEN);
+    newNode->dstIP = (version==4)?my_malloc(INET_ADDRSTRLEN):my_malloc( INET6_ADDRSTRLEN);
+    strcpy(newNode->srcIP, srcAddress);
+    strcpy(newNode->dstIP, dstAddress);
     newNode->srcPORT = srcPort;
     newNode->dstPORT = dstPort;
     newNode->ip_version = version;
@@ -190,6 +191,8 @@ struct my_flow* initializeFlowNode(char *srcAddress, char *dstAddress, int srcPo
     return newNode;
 }
 
+//If doesnt exists, pushes a new node back the list.
+//Else it investigates for packet retransmission in the existing flow.
 void addToFlowList(char *srcAddress, char *dstAddress, int srcPort, int dstPort, int version, int isTCP, int seqNo){
     struct my_flow* newNode = initializeFlowNode(srcAddress, dstAddress, srcPort, dstPort, version, isTCP);
     if(head_flowList == NULL){
@@ -205,6 +208,7 @@ void addToFlowList(char *srcAddress, char *dstAddress, int srcPort, int dstPort,
             int conditionD = (tmp->dstPORT == newNode->dstPORT);
             int conditionE = (tmp->ip_version == newNode->ip_version);
             if( conditionA && conditionB && conditionC && conditionD && conditionE){
+                // network flow already exists in list
                 if(isTCP){
                     if(tmp->prevSequenceNo <= seqNo){
                         tmp->prevSequenceNo = seqNo;
@@ -212,10 +216,12 @@ void addToFlowList(char *srcAddress, char *dstAddress, int srcPort, int dstPort,
                         tmp->retrPackets++;
                     }
                 }
-                break; // network flow already exists in list
+                free(newNode);
+                break;
             }else if(tmp->next == NULL){
                 //not found and we are at the end
                 tmp->next = newNode;
+                break;
             }else{
                 tmp = tmp->next;
             }
@@ -260,6 +266,8 @@ void printFlows(){
         }else{
             printf("\tUDP ]\n");
         }
+        // printf("(%s),(%s),(%d),(%d),",tmp->srcIP,tmp->dstIP,tmp->srcPORT,tmp->dstPORT);
+        // (tmp->isTCP)?printf("(TCP)\n"):printf("(TCP)\n");
         tmp = tmp->next;
     }
 }
@@ -269,7 +277,6 @@ void printFlows(){
 ////////////////////////////////////////////////////////////////////////////////////
 
 void startSniff(char* name,int isFile){
-    const u_char* packet;
     char errbuf[PCAP_ERRBUF_SIZE];
 
     initializeStatStruct();
@@ -284,18 +291,15 @@ void startSniff(char* name,int isFile){
         }
     }
 
-        /* Grab a packet */
-    int i=0, count=0; 
-    /* Loop forever & call processPacket() for every received packet*/ 
-    if ( -1 == pcap_loop(handle, breakLoop, processPacket, (u_char *)&count) ){
-        fprintf(stderr, "ERROR: %s\n", pcap_geterr(handle) );
-        exit(1);
+    // Loop until (breakLoop), call processPacket() for every received packet
+    if ( -1 == pcap_loop(handle, breakLoop, processPacket, NULL)){
+        exit(EXIT_FAILURE);
     }
     
     int tcpFlows = 0, udpFlows = 0, totalFlows = 0;
+    int retrCounter = 0; //for retransmited packets
+    //count flows
     struct my_flow* tmp = head_flowList;
-
-    size_t retrCounter = 0;
     while(tmp != NULL){
         totalFlows ++;
         if(tmp->isTCP){
@@ -306,17 +310,18 @@ void startSniff(char* name,int isFile){
         }
         tmp = tmp->next;
     }
+    // aftermath
     if(isFile && !breakLoop)
         printf("%c[2K \rEnd Of File\n",27);//delete current line and print
     printf("----------------------------------------------------\n");
     printf("Flow statistics:\tTCP:%d\tUDP:%d\tTOTAL:%d\n", tcpFlows,udpFlows,totalFlows);
     printf("----------------------------------------------------\n");
-    printf("Total TCP packets:\t%zu\tbytes:\t%zu\n",gStat->totalTcpPackets,gStat->totalTcpBytes);
-    printf("Total UDP packets:\t%zu\tbytes:\t%zu\n",gStat->totalUdpPackets,gStat->totalUdpBytes);
-    printf("Total packets:\t\t%zu\t\n",gStat->totalPackets);
+    printf("TCP packets:\t%zu\tTCP bytes:\t%zu\n",gStat->totalTcpPackets,gStat->totalTcpBytes);
+    printf("UDP packets:\t%zu\tUDP bytes:\t%zu\n",gStat->totalUdpPackets,gStat->totalUdpBytes);
+    printf("Total packets:\t%zu\t\n",gStat->totalPackets);
     printf("----------------------------------------------------\n");
-    printf("Total re-Transmissions: %zu (based on TCP SEQ numbers only)\n",retrCounter);
-    /*And close the session */
+    printf("Total re-Transmissions: %d (based on TCP SEQ numbers only)\n",retrCounter);
+    // close session
     pcap_close(handle);
 }
 
@@ -332,7 +337,6 @@ void initializeStatStruct(){
 
 pcap_t* initializeDevice(char* devName){
     char errbuf[PCAP_ERRBUF_SIZE]; /* Error String */
-    struct bpf_program fp;         /* The compliled filter expression */
     bpf_u_int32 mask;              /* The netmask of our sniffing device */
     bpf_u_int32 net;               /* The IP of our sniffering device */
 
@@ -343,17 +347,18 @@ pcap_t* initializeDevice(char* devName){
         mask = 0;
         return NULL;
     }
-    /* Open the session in promiscuous mode */
+    // Open in promiscuous mode
     handle = pcap_open_live(devName, BUFSIZ, 1, 100, errbuf);
     if(handle == NULL){
         fprintf(stderr, "Couldn't open device %s: %s\n", devName, errbuf); 
         return NULL;
     }
 
-    // if(pcap_set_snaplen(handle,MAX_PACKET_SIZE) == -1){
-    //     fprintf(stderr, "Couldn't set suggested packet size. Are you on 64-bit PC?\n"); 
-    //     return NULL;
-    // }
+    //set Snapshot length to max
+    if(pcap_set_snaplen(handle,TCP_MAXWIN) == -1){
+        fprintf(stderr, "Couldn't set suggested packet size. Are you on 64-bit PC?\n"); 
+        return NULL;
+    }
     return handle;
 }
 
@@ -363,11 +368,12 @@ pcap_t* initializeDevice(char* devName){
 
 int main(int argc, char *argv[])
 {
-    int opt;                 /* used for command line arguments */
-    char *input_file;        /* path to the input file */
-    char *interface_name;    /* path to the input file */
+    int opt;                 // used for command line arguments
+    char *input_file;        // path to the input file
+    char *interface_name;    // path to the input file
     input_file = NULL;
     interface_name = NULL;
+
     signal(SIGINT, intHandler);//SIGINT handler
 
     if (argv[optind] == NULL) {
@@ -393,6 +399,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    #ifdef INTERACTIVE_MODE
     printf("\nshow network flows?[y/n]  ");
     char c;
     while(1){
@@ -405,8 +412,24 @@ int main(int argc, char *argv[])
         else
             printf("[y/n] ");
     }
-    //should also clean structs but im lazy
+    #endif
+
+    //free allocated stuff
+    freeFlows();
+    free(gStat);
     return(0);
+}
+
+
+void freeFlows(){
+    struct my_flow* nxt = head_flowList;
+    struct my_flow* tmp = head_flowList;
+    
+    while(tmp != NULL){
+        nxt = tmp->next;
+        free(tmp);
+        tmp = nxt;
+    }
 }
 
 inline void* my_malloc(size_t size){
@@ -420,14 +443,16 @@ inline void* my_malloc(size_t size){
 
 void usage(void) {
     printf("\n"
-           "Usage:\n"
-           "    ./monitor -i in_file\n"
-           "    ./monitor -h\n");
+           "\t\t\t   [Usage]\n"
+           "----------------------------------------------------------------\n"
+           "    $./monitor -i in_file\n"
+           "    #./monitor -r in_file\n"
+           "    $./monitor -h\n");
     printf("\n"
-           "\t\t\t[Options]\n"
+           "\t\t\t  [Options]\n"
            "----------------------------------------------------------------\n"
            " -i   device   Network interface name (e.g., eth0)\n"
-           " -o    path    Packet capture file name (e.g., test.pcap)\n"
+           " -r    path    Packet capture file name (e.g., test.pcap)\n"
            " -h            This help message\n");
     exit(EXIT_FAILURE);
 }

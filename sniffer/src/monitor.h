@@ -12,15 +12,17 @@
 #include <pcap.h>
 
 #define clear() printf("\033[H\033[J")
-// #define MAX_PACKET_SIZE TCP_MAXWIN // 65535 for 64-bit systems
+
+// if wou also want to print the flows define this
+// #define INTERACTIVE_MODE 1
 
 void usage(void);
 void startSniff(char*,int);
 pcap_t* initializeDevice(char*);
 void processPacket(u_char *, const struct pcap_pkthdr*, const u_char *);
-u_int16_t handle_ethernet(u_char *, const struct pcap_pkthdr*,const u_char*);
-u_char* handle_IPv4(u_char *,const struct pcap_pkthdr* ,const u_char*);
-u_char* handle_IPv6(u_char *,const struct pcap_pkthdr* ,const u_char*);
+u_int16_t handle_ethernet(const struct pcap_pkthdr*,const u_char*);
+u_char* handle_IPv4(const struct pcap_pkthdr* ,const u_char*);
+u_char* handle_IPv6(const struct pcap_pkthdr* ,const u_char*);
 inline void* my_malloc(size_t size);
 void addToFlowList(char*, char*, int, int, int, int, int);
 void initializeStatStruct();
@@ -28,6 +30,7 @@ struct my_flow* initializeFlowNode(char *, char *, int, int, int, int);
 void printTCP(int,int,int,int,int);
 void printUDP(int,int,int,int);
 void printFlows();
+void freeFlows();
 
 struct my_ip {
 	u_int8_t	ip_vhl;		/* header length, version */

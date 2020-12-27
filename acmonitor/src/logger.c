@@ -15,7 +15,6 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <grp.h>
-#include "util.h"
 
 char *logPath = "./file_logging.log";
 
@@ -33,7 +32,7 @@ int fileExists(char *);
 
 
 
-FILE *fopen(const char *path, const char *mode) 
+FILE *fopen(const char *path, const char *mode)
 {
 	int access = 0, flag = 0;
 	if( fileExists((char*)path) ){
@@ -67,8 +66,8 @@ FILE *fopen(const char *path, const char *mode)
     char*   file_cont = "";
     file_cont = (access == 0 || flag == 1 || original_fopen_ret == NULL)
                 ?"":readFile(original_fopen_ret, &cont_len);
-    
-    
+
+
     /* Create log if not exists, and apend entry to it */
 	createLogFile();
 	appendEntryToLogfile(file_cont, cont_len, realpath(path,NULL), userID, T, access, flag);
@@ -80,7 +79,7 @@ FILE *fopen(const char *path, const char *mode)
 }
 
 
-size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) 
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	int access = 2, flag = 0;
 	size_t original_fwrite_ret;
@@ -192,7 +191,7 @@ int checkPermissions(uid_t userID, gid_t groupID, struct stat sb, const char *oc
 
 
 int fileExists(char *filepath){
-  struct stat   buffer;   
+  struct stat   buffer;
   return (stat(filepath, &buffer) == 0);
 }
 
@@ -269,9 +268,9 @@ char* executeMD5(char *data, size_t len, int* return_size){
 char* createFileFingerprint(char *contents, size_t len, time_t T){
     struct  tm tm = *localtime(&T);
 	char signature[len+16];
-	sprintf(signature,"%s\n%02d%02d%04d%02d%02d%02d", 
-            contents, tm.tm_mday, tm.tm_mon+1, 
-            tm.tm_year+1900, tm.tm_hour, 
+	sprintf(signature,"%s\n%02d%02d%04d%02d%02d%02d",
+            contents, tm.tm_mday, tm.tm_mon+1,
+            tm.tm_year+1900, tm.tm_hour,
             tm.tm_min, tm.tm_sec);
 
     int size;
